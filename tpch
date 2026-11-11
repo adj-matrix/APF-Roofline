@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Repo-local entry point: ./tpch <command> ...   (see `./tpch --help`)
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO" && PYTHONPATH="$REPO/src:$REPO${PYTHONPATH:+:$PYTHONPATH}" exec "$REPO/.venv/bin/python" -m tpch "$@"

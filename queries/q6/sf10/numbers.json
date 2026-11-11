@@ -1,0 +1,576 @@
+{
+  "fio_seq_buffered_8k_MiBps": {
+    "median": 187.63644886016846,
+    "min": 186.4865255355835,
+    "max": 190.6029176712036,
+    "n": 3,
+    "values": [
+      190.6029176712036,
+      186.4865255355835,
+      187.63644886016846
+    ]
+  },
+  "conditions": {
+    "A": {
+      "label": "v1",
+      "cold_wall_s": {
+        "median": 49.95768880844116,
+        "min": 49.85745167732239,
+        "max": 50.573856353759766,
+        "n": 3,
+        "values": [
+          50.573856353759766,
+          49.85745167732239,
+          49.95768880844116
+        ]
+      },
+      "warm_wall_s": {
+        "median": 10.899243593215942,
+        "min": 10.614454746246338,
+        "max": 10.906814336776733,
+        "n": 3,
+        "values": [
+          10.899243593215942,
+          10.906814336776733,
+          10.614454746246338
+        ]
+      },
+      "cold_dev_MiBps": {
+        "median": 174.3812470122446,
+        "min": 172.74470741799504,
+        "max": 175.97668159833555,
+        "n": 3,
+        "values": [
+          172.74470741799504,
+          175.97668159833555,
+          174.3812470122446
+        ]
+      },
+      "cold_rareq_kB": {
+        "median": 126.55749615414341,
+        "min": 126.55691653180422,
+        "max": 126.57642413339366,
+        "n": 3,
+        "values": [
+          126.55691653180422,
+          126.55749615414341,
+          126.57642413339366
+        ]
+      },
+      "cold_busy": {
+        "median": 0.9906178467930137,
+        "min": 0.9900170560260806,
+        "max": 0.9975808344779342,
+        "n": 3,
+        "values": [
+          0.9906178467930137,
+          0.9975808344779342,
+          0.9900170560260806
+        ]
+      },
+      "cold_usr_s": {
+        "median": 11.693779889526368,
+        "min": 11.317192268371581,
+        "max": 12.23164,
+        "n": 3,
+        "values": [
+          11.693779889526368,
+          11.317192268371581,
+          12.23164
+        ]
+      },
+      "cold_sys_s": {
+        "median": 6.7801913812255865,
+        "min": 6.5210799999999995,
+        "max": 6.888596134185791,
+        "n": 3,
+        "values": [
+          6.7801913812255865,
+          6.888596134185791,
+          6.5210799999999995
+        ]
+      },
+      "warm_usr_s": {
+        "median": 8.986225130844115,
+        "min": 8.709076468048096,
+        "max": 9.14596332605362,
+        "n": 3,
+        "values": [
+          8.986225130844115,
+          9.14596332605362,
+          8.709076468048096
+        ]
+      },
+      "warm_sys_s": {
+        "median": 1.6218865389823913,
+        "min": 1.6117454746246338,
+        "max": 1.678697720413208,
+        "n": 3,
+        "values": [
+          1.6218865389823913,
+          1.678697720413208,
+          1.6117454746246338
+        ]
+      },
+      "totals_source": [
+        "samples"
+      ],
+      "pages": 1125016,
+      "governor": "schedutil",
+      "analyze_cold": {
+        "exec_s": 50.400863,
+        "io_read_s": 40.834321,
+        "scan_self_s": 50.067438,
+        "agg_self_s": 0.3332849999999962,
+        "rows_out": 1139264.0
+      },
+      "analyze_warm": {
+        "exec_s": 10.075947,
+        "io_read_s": 2.450362,
+        "scan_self_s": 9.813081,
+        "agg_self_s": 0.26283200000000034,
+        "rows_out": 1139264.0
+      },
+      "cpu_ns_per_tuple": 181.69629821972518,
+      "prediction": {
+        "total_s": 46.84157877316219,
+        "lower_s": 46.84157877316219,
+        "upper_s": 57.74082236637813,
+        "components": {
+          "io_s": 46.84157877316219,
+          "cpu_s": 10.899243593215942
+        },
+        "bound": "io",
+        "assumptions": [
+          "plan is a single non-parallel Seq Scan on lineitem + Aggregate (check plan.json)",
+          "every lineitem page is read exactly once; no index, no buffer hits on a cold run",
+          "device sustains 188 MiB/s for the scan's request size",
+          "executor cost 182 ns/tuple independent of table size",
+          "aggregate output (1 row) and planning time negligible",
+          "IO/CPU combined as max; true value expected in [max, sum]"
+        ]
+      },
+      "error_vs_lower": 0.06652444509544031,
+      "overlap_frac": 0.7140985052193398
+    },
+    "B1": {
+      "label": "v2defrag",
+      "cold_wall_s": {
+        "median": 44.94682836532593,
+        "min": 44.67443656921387,
+        "max": 47.53433680534363,
+        "n": 3,
+        "values": [
+          47.53433680534363,
+          44.67443656921387,
+          44.94682836532593
+        ]
+      },
+      "warm_wall_s": {
+        "median": 9.949586391448975,
+        "min": 9.9404935836792,
+        "max": 10.66071891784668,
+        "n": 3,
+        "values": [
+          10.66071891784668,
+          9.949586391448975,
+          9.9404935836792
+        ]
+      },
+      "cold_dev_MiBps": {
+        "median": 195.04731509596144,
+        "min": 183.46072687082312,
+        "max": 195.16977769152965,
+        "n": 3,
+        "values": [
+          183.46072687082312,
+          195.04731509596144,
+          195.16977769152965
+        ]
+      },
+      "cold_rareq_kB": {
+        "median": 127.84879257512335,
+        "min": 127.78443878681388,
+        "max": 127.88851336824814,
+        "n": 3,
+        "values": [
+          127.78443878681388,
+          127.88851336824814,
+          127.84879257512335
+        ]
+      },
+      "cold_busy": {
+        "median": 0.9940379607188534,
+        "min": 0.9902647553586924,
+        "max": 0.9977300208037672,
+        "n": 3,
+        "values": [
+          0.9940379607188534,
+          0.9902647553586924,
+          0.9977300208037672
+        ]
+      },
+      "cold_usr_s": {
+        "median": 12.114017673549652,
+        "min": 11.969000000000001,
+        "max": 12.18,
+        "n": 3,
+        "values": [
+          12.114017673549652,
+          12.18,
+          11.969000000000001
+        ]
+      },
+      "cold_sys_s": {
+        "median": 7.061599999999999,
+        "min": 7.046217048587799,
+        "max": 7.156000000000001,
+        "n": 3,
+        "values": [
+          7.046217048587799,
+          7.061599999999999,
+          7.156000000000001
+        ]
+      },
+      "warm_usr_s": {
+        "median": 8.67021256881714,
+        "min": 8.499684738616944,
+        "max": 9.186544161529541,
+        "n": 3,
+        "values": [
+          9.186544161529541,
+          8.67021256881714,
+          8.499684738616944
+        ]
+      },
+      "warm_sys_s": {
+        "median": 1.1274975134277343,
+        "min": 1.120030366973877,
+        "max": 1.256539230041504,
+        "n": 3,
+        "values": [
+          1.1274975134277343,
+          1.120030366973877,
+          1.256539230041504
+        ]
+      },
+      "totals_source": [
+        "samples"
+      ],
+      "pages": 1124956,
+      "governor": "schedutil",
+      "analyze_cold": {
+        "exec_s": 45.514790999999995,
+        "io_read_s": 34.632324999999994,
+        "scan_self_s": 45.129829,
+        "agg_self_s": 0.3849069999999992,
+        "rows_out": 1139264.0
+      },
+      "cpu_ns_per_tuple": 165.86499794067086,
+      "prediction": {
+        "total_s": 46.83908059115732,
+        "lower_s": 46.83908059115732,
+        "upper_s": 56.788666982606294,
+        "components": {
+          "io_s": 46.83908059115732,
+          "cpu_s": 9.949586391448975
+        },
+        "bound": "io",
+        "assumptions": [
+          "plan is a single non-parallel Seq Scan on lineitem + Aggregate (check plan.json)",
+          "every lineitem page is read exactly once; no index, no buffer hits on a cold run",
+          "device sustains 188 MiB/s for the scan's request size",
+          "executor cost 166 ns/tuple independent of table size",
+          "aggregate output (1 row) and planning time negligible",
+          "IO/CPU combined as max; true value expected in [max, sum]"
+        ]
+      },
+      "error_vs_lower": -0.04039900446270983,
+      "overlap_frac": 1.190184008800372
+    },
+    "B2": {
+      "label": "condB",
+      "cold_wall_s": {
+        "median": 48.00976252555847,
+        "min": 47.633461713790894,
+        "max": 48.23710751533508,
+        "n": 3,
+        "values": [
+          48.23710751533508,
+          48.00976252555847,
+          47.633461713790894
+        ]
+      },
+      "warm_wall_s": {
+        "median": 10.071881532669067,
+        "min": 10.068062543869019,
+        "max": 10.463514566421509,
+        "n": 3,
+        "values": [
+          10.463514566421509,
+          10.071881532669067,
+          10.068062543869019
+        ]
+      },
+      "cold_dev_MiBps": {
+        "median": 183.07230342622404,
+        "min": 182.2274479705386,
+        "max": 184.51847902763961,
+        "n": 3,
+        "values": [
+          182.2274479705386,
+          183.07230342622404,
+          184.51847902763961
+        ]
+      },
+      "cold_rareq_kB": {
+        "median": 127.84375,
+        "min": 127.716673524696,
+        "max": 127.84550916916433,
+        "n": 3,
+        "values": [
+          127.716673524696,
+          127.84375,
+          127.84550916916433
+        ]
+      },
+      "cold_busy": {
+        "median": 1.00004660457215,
+        "min": 0.9999770401793944,
+        "max": 1.0000532878803636,
+        "n": 3,
+        "values": [
+          0.9999770401793944,
+          1.00004660457215,
+          1.0000532878803636
+        ]
+      },
+      "cold_usr_s": {
+        "median": 11.82,
+        "min": 11.6,
+        "max": 12.07,
+        "n": 3,
+        "values": [
+          12.07,
+          11.6,
+          11.82
+        ]
+      },
+      "cold_sys_s": {
+        "median": 6.83,
+        "min": 6.680000000000001,
+        "max": 7.0,
+        "n": 3,
+        "values": [
+          6.680000000000001,
+          7.0,
+          6.83
+        ]
+      },
+      "warm_usr_s": {
+        "median": 8.88,
+        "min": 8.829999999999998,
+        "max": 9.23,
+        "n": 3,
+        "values": [
+          9.23,
+          8.88,
+          8.829999999999998
+        ]
+      },
+      "warm_sys_s": {
+        "median": 1.23,
+        "min": 1.2,
+        "max": 1.2300000000000002,
+        "n": 3,
+        "values": [
+          1.2300000000000002,
+          1.2,
+          1.23
+        ]
+      },
+      "totals_source": [
+        "counters"
+      ],
+      "pages": 1124956,
+      "governor": "schedutil",
+      "analyze_cold": {
+        "exec_s": 47.582525000000004,
+        "io_read_s": 37.250561999999995,
+        "scan_self_s": 47.168912,
+        "agg_self_s": 0.4135680000000066,
+        "rows_out": 1139264.0
+      },
+      "analyze_warm": {
+        "exec_s": 10.392721,
+        "io_read_s": 2.511038,
+        "scan_self_s": 10.13269,
+        "agg_self_s": 0.2600049999999992,
+        "rows_out": 1139264.0
+      },
+      "cpu_ns_per_tuple": 167.90372423024385,
+      "prediction": {
+        "total_s": 46.83908059115732,
+        "lower_s": 46.83908059115732,
+        "upper_s": 56.91096212382639,
+        "components": {
+          "io_s": 46.83908059115732,
+          "cpu_s": 10.071881532669067
+        },
+        "bound": "io",
+        "assumptions": [
+          "plan is a single non-parallel Seq Scan on lineitem + Aggregate (check plan.json)",
+          "every lineitem page is read exactly once; no index, no buffer hits on a cold run",
+          "device sustains 188 MiB/s for the scan's request size",
+          "executor cost 168 ns/tuple independent of table size",
+          "aggregate output (1 row) and planning time negligible",
+          "IO/CPU combined as max; true value expected in [max, sum]"
+        ]
+      },
+      "error_vs_lower": 0.024993700124467555,
+      "overlap_frac": 0.8837673049862691
+    },
+    "C": {
+      "label": "condC",
+      "cold_wall_s": {
+        "median": 47.890100717544556,
+        "min": 47.69907760620117,
+        "max": 48.593202114105225,
+        "n": 3,
+        "values": [
+          47.890100717544556,
+          48.593202114105225,
+          47.69907760620117
+        ]
+      },
+      "warm_wall_s": {
+        "median": 11.228577136993408,
+        "min": 10.921669483184814,
+        "max": 11.275221586227417,
+        "n": 3,
+        "values": [
+          11.228577136993408,
+          11.275221586227417,
+          10.921669483184814
+        ]
+      },
+      "cold_dev_MiBps": {
+        "median": 183.53496194005623,
+        "min": 181.2268021424288,
+        "max": 184.26432380544284,
+        "n": 3,
+        "values": [
+          183.53496194005623,
+          181.2268021424288,
+          184.26432380544284
+        ]
+      },
+      "cold_rareq_kB": {
+        "median": 127.83104432671959,
+        "min": 126.88002476327156,
+        "max": 127.85254634562114,
+        "n": 3,
+        "values": [
+          127.83104432671959,
+          126.88002476327156,
+          127.85254634562114
+        ]
+      },
+      "cold_busy": {
+        "median": 1.0000575777222542,
+        "min": 1.000039659186909,
+        "max": 1.0001031968341079,
+        "n": 3,
+        "values": [
+          1.000039659186909,
+          1.0000575777222542,
+          1.0001031968341079
+        ]
+      },
+      "cold_usr_s": {
+        "median": 25.9,
+        "min": 24.28,
+        "max": 26.169999999999998,
+        "n": 3,
+        "values": [
+          26.169999999999998,
+          24.28,
+          25.9
+        ]
+      },
+      "cold_sys_s": {
+        "median": 10.96,
+        "min": 10.84,
+        "max": 11.09,
+        "n": 3,
+        "values": [
+          10.96,
+          10.84,
+          11.09
+        ]
+      },
+      "warm_usr_s": {
+        "median": 9.389999999999999,
+        "min": 9.16,
+        "max": 9.54,
+        "n": 3,
+        "values": [
+          9.389999999999999,
+          9.54,
+          9.16
+        ]
+      },
+      "warm_sys_s": {
+        "median": 1.75,
+        "min": 1.7299999999999998,
+        "max": 1.83,
+        "n": 3,
+        "values": [
+          1.83,
+          1.7299999999999998,
+          1.75
+        ]
+      },
+      "totals_source": [
+        "counters"
+      ],
+      "pages": 1124956,
+      "governor": "performance",
+      "analyze_cold": {
+        "exec_s": 47.670122000000006,
+        "io_read_s": 25.840991000000002,
+        "scan_self_s": 46.883155,
+        "agg_self_s": 0.7868050000000003,
+        "rows_out": 1139264.0
+      },
+      "analyze_warm": {
+        "exec_s": 11.001386,
+        "io_read_s": 2.867323,
+        "scan_self_s": 10.733234,
+        "agg_self_s": 0.26808399999999893,
+        "rows_out": 1139264.0
+      },
+      "cpu_ns_per_tuple": 187.18646689722817,
+      "prediction": {
+        "total_s": 46.83908059115732,
+        "lower_s": 46.83908059115732,
+        "upper_s": 58.06765772815073,
+        "components": {
+          "io_s": 46.83908059115732,
+          "cpu_s": 11.228577136993408
+        },
+        "bound": "io",
+        "assumptions": [
+          "plan is a single non-parallel Seq Scan on lineitem + Aggregate (check plan.json)",
+          "every lineitem page is read exactly once; no index, no buffer hits on a cold run",
+          "device sustains 188 MiB/s for the scan's request size",
+          "executor cost 187 ns/tuple independent of table size",
+          "aggregate output (1 row) and planning time negligible",
+          "IO/CPU combined as max; true value expected in [max, sum]"
+        ]
+      },
+      "error_vs_lower": 0.022438957236612822,
+      "overlap_frac": 0.9063977462536575
+    }
+  }
+}

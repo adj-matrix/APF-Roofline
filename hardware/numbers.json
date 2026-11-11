@@ -1,0 +1,119 @@
+{
+ "scan": "20261111-184649_location",
+ "cache_hit_ms": 0.3,
+ "targets": {
+  "fio.dat": {
+   "MiBps": 189.85090261450551,
+   "pieces": 32,
+   "cache_hit_pieces": 0,
+   "piece_MiBps": {
+    "median": 191.75,
+    "min": 169.7,
+    "max": 196.8
+   },
+   "phys_GiB": {
+    "min": 5.865,
+    "max": 69.127,
+    "mean": 27.956812500000005
+   },
+   "r_await_ms": {
+    "min": 0.6,
+    "max": 0.702
+   },
+   "earlier_MiBps": {
+    "20261111-162205_location": 188.64904760095385,
+    "20261111-171016_location": 187.85565476019852
+   }
+  },
+  "sf1.lineitem": {
+   "MiBps": 175.5060082238812,
+   "pieces": 2,
+   "cache_hit_pieces": 0,
+   "piece_MiBps": {
+    "median": 175.2,
+    "min": 173.0,
+    "max": 177.4
+   },
+   "phys_GiB": {
+    "min": 92.857,
+    "max": 96.186,
+    "mean": 94.79552487915838
+   },
+   "r_await_ms": {
+    "min": 0.669,
+    "max": 0.69
+   },
+   "earlier_MiBps": {
+    "20261111-162205_location": 173.84727934198037,
+    "20261111-171016_location": 174.24347515903372
+   }
+  },
+  "sf10.lineitem": {
+   "MiBps": 185.50325895156317,
+   "pieces": 18,
+   "cache_hit_pieces": 0,
+   "piece_MiBps": {
+    "median": 185.8,
+    "min": 178.4,
+    "max": 196.2
+   },
+   "phys_GiB": {
+    "min": 27.565,
+    "max": 68.92,
+    "mean": 35.69233459443314
+   },
+   "r_await_ms": {
+    "min": 0.6,
+    "max": 0.664
+   },
+   "earlier_MiBps": {
+    "20261111-162205_location": 183.96674683764223,
+    "20261111-171016_location": 184.14907303417868
+   }
+  }
+ },
+ "earlier_scans_evicted": {
+  "20261111-162205_location": false,
+  "20261111-171016_location": false
+ },
+ "controller_cache_test": {
+  "log": "results/bench/20261111-184550_controller_cache/log.txt",
+  "steps": [
+   {
+    "claim": "C1",
+    "step": "read A (just written)",
+    "MBps": 1200.0
+   },
+   {
+    "claim": "C1",
+    "step": "read A again",
+    "MBps": 1300.0
+   },
+   {
+    "claim": "C2",
+    "step": "read other data (fio file, first 879 MiB)",
+    "MBps": 129.0
+   },
+   {
+    "claim": "C2",
+    "step": "read the same other data again",
+    "MBps": 196.0
+   },
+   {
+    "claim": "C3",
+    "step": "read A after reading other data",
+    "MBps": 1200.0
+   },
+   {
+    "claim": "C4",
+    "step": "read A after 2 GiB of other writes",
+    "MBps": 186.0
+   },
+   {
+    "claim": "C4",
+    "step": "read A again",
+    "MBps": 185.0
+   }
+  ]
+ }
+}

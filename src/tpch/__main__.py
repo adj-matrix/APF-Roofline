@@ -1,0 +1,136 @@
+"""CLI: python -m tpch <command>   (or ./tpch <command> from the repo root)"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from . import config, sysinfo
+from .runner import CACHES, MODES, run_query
+from .summarize import summarize
+
+
+def _kv(s: str) -> tuple[str, str]:
+    k, sep, v = s.partition("=")
+    if not sep:
+        raise argparse.ArgumentTypeError(f"expected NAME=VALUE, got {s!r}")
+    return k, v
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(prog="tpch")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    r = sub.add_parser("run", help="measure a query; one run directory per repetition")
+    r.add_argument("--query", required=True, help="query directory under queries/, e.g. q6")
+    r.add_argument("--sf", type=int, required=True)
+    r.add_argument("--cache", choices=CACHES, default="cold")
+    r.add_argument("--mode", choices=list(MODES), default="plain")
+    r.add_argument("--repeat", type=int, default=3)
+    r.add_argument("--label", default="")
+    r.add_argument("--set", type=_kv, action="append", default=[], metavar="NAME=VALUE",
+                   help="PostgreSQL setting for the query's connection, e.g. --set work_mem=256MB (repeatable)")
+    r.add_argument("--dry-run", action="store_true", help="print what would run; touch nothing")
+
+    se = sub.add_parser("experiment", help="randomized block design: several conditions, interleaved")
+    se.add_argument("--query", required=True)
+    se.add_argument("--sf", type=int, nargs="+", required=True)
+    se.add_argument("--cache", choices=CACHES, nargs="+", default=list(CACHES))
+    se.add_argument("--mode", choices=list(MODES), nargs="+", default=["plain"])
+    se.add_argument("--blocks", type=int, default=3, help="each block runs every condition once, shuffled")
+    se.add_argument("--seed", type=int, help="shuffle seed (default: random, recorded)")
+    se.add_argument("--label", default="")
+    se.add_argument("--set", type=_kv, action="append", default=[], metavar="NAME=VALUE")
+    se.add_argument("--dry-run", action="store_true")
+
+    s = sub.add_parser("summarize", help="(re)build timeline.csv + summary.json of run dirs")
+    s.add_argument("runs", nargs="+", type=Path)
+
+    b = sub.add_parser("bench", help="microbenchmarks")
+    bsub = b.add_subparsers(dest="bench", required=True)
+    bi = bsub.add_parser("io", help="fio read sweep on a dedicated file under DATA_ROOT/bench")
+    bi.add_argument("--file-gib", type=int, default=16)
+    bi.add_argument("--runtime", type=int, default=15, help="seconds per test")
+    bi.add_argument("--dry-run", action="store_true")
+    bl = bsub.add_parser("location", help="O_DIRECT read bandwidth vs physical position (after controller-cache eviction)")
+    bl.add_argument("--table", nargs="+", default=[], metavar="SF:TABLE", help="e.g. 1:lineitem 10:orders")
+    bl.add_argument("--file", nargs="+", default=[], help="extra files (read only)")
+    bl.add_argument("--no-default", action="store_true", help="skip the fio file + lineitem of every loaded SF")
+    bl.add_argument("--dry-run", action="store_true")
+
+    rp = sub.add_parser("report", help="figures + numbers.json of one report directory (its figures.py)")
+    rp.add_argument("cell", help="a cell under queries/ (e.g. q6/sf10), or 'hardware'")
+    rp.add_argument("--cond", type=_kv, action="append", default=[], metavar="NAME=LABEL",
+                    help="condition name and run label, e.g. --cond A=v1 (repeatable, ordered)")
+    rp.add_argument("--out", type=Path, help="output directory (default: the cell directory)")
+    rp.add_argument("--timeline", nargs="+", help="condition names drawn in the timeline figure (max 3)")
+
+    sub.add_parser("sysinfo", help="print the environment snapshot")
+
+    a = p.parse_args(argv)
+    if a.cmd == "run":
+        cfg = config.load()
+        runs, sh = run_query(cfg, a.query, a.sf, a.cache, a.mode, a.label, a.repeat,
+                             dict(a.set), dry_run=a.dry_run)
+        if a.dry_run:
+            print("\n".join(sh.log))
+        for run in runs:
+            if not a.dry_run:
+                sm = json.loads((run / "summary.json").read_text())
+                print(f"{run.name}: wall {sm['wall_s']:.2f}s  read {sm['dev_read_MiB']:.0f} MiB  "
+                      f"backend CPU {sm['backend_cpu_util'] or 0:.0%}")
+    elif a.cmd == "experiment":
+        from .experiment import conditions, run_experiment
+        conds = conditions(a.sf, a.cache, a.mode)
+        cfg = config.load()
+        path, sh = run_experiment(cfg, a.query, conds, a.blocks, a.seed, a.label,
+                               dict(a.set), dry_run=a.dry_run)
+        if a.dry_run:
+            print("\n".join(sh.log))
+        else:
+            doc = json.loads(path.read_text())
+            for o in doc["order"]:
+                sm = json.loads((cfg.repo / cfg.RESULTS_DIR / "runs" / o["run"] / "summary.json").read_text())
+                print(f"{o['position']:3d} b{o['block']} sf{o['sf']:<3d} {o['mode']:<8s} {o['cache']:<4s} "
+                      f"wall {sm['wall_s']:7.2f}s  read {sm['dev_read_MiB']:7.0f} MiB  (prev {o['prev']})")
+            print(f"experiment file: {path}")
+    elif a.cmd == "summarize":
+        for run in a.runs:
+            summarize(run)
+            print(f"summarized {run}")
+    elif a.cmd == "bench" and a.bench == "io":
+        from .bench.io import GiB, run_io_bench
+        out, sh = run_io_bench(config.load(), file_size=a.file_gib * GiB, runtime_s=a.runtime,
+                               dry_run=a.dry_run)
+        print("\n".join(sh.log) if a.dry_run else f"results in {out}")
+    elif a.cmd == "bench" and a.bench == "location":
+        from .bench.location import default_targets, relation_files, run_location_bench
+        cfg = config.load()
+        targets = [] if a.no_default else default_targets(cfg)
+        for t in a.table:
+            sf, table = t.split(":", 1)
+            targets.append((f"sf{sf}.{table}", relation_files(cfg, int(sf), table)))
+        targets += [(Path(f).name, [f]) for f in a.file]
+        out, sh = run_location_bench(cfg, targets, dry_run=a.dry_run)
+        print("\n".join(sh.log) if a.dry_run else f"results in {out}")
+    elif a.cmd == "report":
+        import importlib
+        cfg = config.load()
+        cell = a.cell.strip("/")
+        rel = Path(cell) if (cfg.repo / cell / "figures.py").exists() else Path("queries") / cell
+        figures = importlib.import_module(".".join(rel.parts) + ".figures")
+        a.out = a.out or cfg.repo / rel
+        nums = figures.build(cfg, dict(a.cond), a.out, a.timeline)
+        for name, c in nums.get("conditions", {}).items():
+            print(f"{name} ({c['label']}): cold {c['cold_wall_s']['median']:.2f}s  "
+                  f"predicted [{c['prediction']['lower_s']:.1f}, {c['prediction']['upper_s']:.1f}]  "
+                  f"warm {c['warm_wall_s']['median']:.2f}s")
+        print(f"figures + numbers.json in {a.out}")
+    elif a.cmd == "sysinfo":
+        print(json.dumps(sysinfo.collect(), indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
