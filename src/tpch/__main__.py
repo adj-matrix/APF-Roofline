@@ -34,7 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--dry-run", action="store_true", help="print what would run; touch nothing")
 
     se = sub.add_parser("experiment", help="randomized block design: several conditions, interleaved")
-    se.add_argument("--query", required=True)
+    se.add_argument("--query", nargs="+", required=True,
+                    help="one query, or several parts of one (q1.m_scan q1.m_filter ...: a factor of the design)")
     se.add_argument("--sf", type=int, nargs="+", required=True)
     se.add_argument("--cache", choices=CACHES, nargs="+", default=list(CACHES))
     se.add_argument("--mode", choices=list(MODES), nargs="+", default=["plain"])
@@ -53,6 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     bi.add_argument("--file-gib", type=int, default=16)
     bi.add_argument("--runtime", type=int, default=15, help="seconds per test")
     bi.add_argument("--dry-run", action="store_true")
+    bm = bsub.add_parser("mem", help="dependent random-access latency vs working-set size (pointer chase)")
+    bm.add_argument("--reps", type=int, default=3)
+    bm.add_argument("--dry-run", action="store_true")
     bl = bsub.add_parser("location", help="O_DIRECT read bandwidth vs physical position (after controller-cache eviction)")
     bl.add_argument("--table", nargs="+", default=[], metavar="SF:TABLE", help="e.g. 1:lineitem 10:orders")
     bl.add_argument("--file", nargs="+", default=[], help="extra files (read only)")
@@ -82,9 +86,9 @@ def main(argv: list[str] | None = None) -> int:
                       f"backend CPU {sm['backend_cpu_util'] or 0:.0%}")
     elif a.cmd == "experiment":
         from .experiment import conditions, run_experiment
-        conds = conditions(a.sf, a.cache, a.mode)
+        conds = conditions(a.sf, a.cache, a.mode, a.query)
         cfg = config.load()
-        path, sh = run_experiment(cfg, a.query, conds, a.blocks, a.seed, a.label,
+        path, sh = run_experiment(cfg, a.query[0], conds, a.blocks, a.seed, a.label,
                                dict(a.set), dry_run=a.dry_run)
         if a.dry_run:
             print("\n".join(sh.log))
@@ -92,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             doc = json.loads(path.read_text())
             for o in doc["order"]:
                 sm = json.loads((cfg.repo / cfg.RESULTS_DIR / "runs" / o["run"] / "summary.json").read_text())
-                print(f"{o['position']:3d} b{o['block']} sf{o['sf']:<3d} {o['mode']:<8s} {o['cache']:<4s} "
+                print(f"{o['position']:3d} b{o['block']} {o.get('query', ''):<14s} sf{o['sf']:<3d} {o['mode']:<8s} {o['cache']:<4s} "
                       f"wall {sm['wall_s']:7.2f}s  read {sm['dev_read_MiB']:7.0f} MiB  (prev {o['prev']})")
             print(f"experiment file: {path}")
     elif a.cmd == "summarize":
@@ -103,6 +107,10 @@ def main(argv: list[str] | None = None) -> int:
         from .bench.io import GiB, run_io_bench
         out, sh = run_io_bench(config.load(), file_size=a.file_gib * GiB, runtime_s=a.runtime,
                                dry_run=a.dry_run)
+        print("\n".join(sh.log) if a.dry_run else f"results in {out}")
+    elif a.cmd == "bench" and a.bench == "mem":
+        from .bench.mem import run_mem_bench
+        out, sh = run_mem_bench(config.load(), reps=a.reps, dry_run=a.dry_run)
         print("\n".join(sh.log) if a.dry_run else f"results in {out}")
     elif a.cmd == "bench" and a.bench == "location":
         from .bench.location import default_targets, relation_files, run_location_bench

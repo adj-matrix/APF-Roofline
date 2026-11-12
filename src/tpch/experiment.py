@@ -27,8 +27,13 @@ from .runner import run_query
 from .shell import Shell
 
 
-def conditions(sfs: list[int], caches: list[str], modes: list[str]) -> list[dict]:
-    return [{"sf": sf, "cache": c, "mode": m} for sf, c, m in itertools.product(sfs, caches, modes)]
+def conditions(sfs: list[int], caches: list[str], modes: list[str],
+               queries: list[str] | None = None) -> list[dict]:
+    """Cross product. With several queries (e.g. microbenchmark parts), the query is a factor too."""
+    base = [{"sf": sf, "cache": c, "mode": m} for sf, c, m in itertools.product(sfs, caches, modes)]
+    if not queries or len(queries) == 1:
+        return base
+    return [{"query": q, **c} for q in queries for c in base]
 
 
 def schedule(conds: list[dict], blocks: int, seed: int) -> list[dict]:
@@ -43,7 +48,10 @@ def schedule(conds: list[dict], blocks: int, seed: int) -> list[dict]:
 
 
 def _key(c: dict | None) -> str | None:
-    return None if c is None else f"sf{c['sf']}_{c['mode']}_{c['cache']}"
+    if c is None:
+        return None
+    k = f"sf{c['sf']}_{c['mode']}_{c['cache']}"
+    return f"{c['query']}_{k}" if "query" in c else k
 
 
 def run_experiment(cfg: Config, query: str, conds: list[dict], blocks: int, seed: int | None = None,
@@ -52,7 +60,8 @@ def run_experiment(cfg: Config, query: str, conds: list[dict], blocks: int, seed
     seed = seed if seed is not None else random.SystemRandom().randrange(2**31)
     order = schedule(conds, blocks, seed)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    eid = f"{stamp}_{query}_{label}" if label else f"{stamp}_{query}"
+    name = query.partition(".")[0]          # q1.m_filter etc. belong to q1's experiments
+    eid = f"{stamp}_{name}_{label}" if label else f"{stamp}_{name}"
     path = cfg.repo / cfg.RESULTS_DIR / "experiments" / f"{eid}.json"
     doc = {"experiment": eid, "query": query, "label": label, "seed": seed, "blocks": blocks,
            "conditions": conds, "settings": settings or {}, "order": []}
@@ -63,7 +72,7 @@ def run_experiment(cfg: Config, query: str, conds: list[dict], blocks: int, seed
     prev = None
     for pos, item in enumerate(order):
         extra = {"experiment": eid, "position": pos, "block": item["block"], "prev": _key(prev)}
-        runs, _ = run_query(cfg, query, item["sf"], item["cache"], item["mode"], label, 1,
+        runs, _ = run_query(cfg, item.get("query", query), item["sf"], item["cache"], item["mode"], label, 1,
                             settings, dry_run=dry_run, start_idx=item["block"], extra_meta=extra, sh=sh)
         doc["order"].append({**item, "position": pos, "prev": extra["prev"], "run": runs[0].name})
         if not dry_run:

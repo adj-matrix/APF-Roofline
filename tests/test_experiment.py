@@ -57,3 +57,15 @@ def test_warm_only_experiment_does_not_evict(tmp_path):
     cfg = config.load(env={"RESULTS_DIR": str(tmp_path)})
     _, sh = run_experiment(cfg, "q6", conditions([1], ["warm"], ["plain"]), blocks=1, seed=0, dry_run=True)
     assert not any("evict.tmp" in ln for ln in sh.log)
+
+
+def test_several_queries_are_a_factor(tmp_path):
+    conds = conditions([1], ["warm"], ["plain"], ["q1.m_scan", "q1.m_filter"])
+    assert conds == [{"query": "q1.m_scan", "sf": 1, "cache": "warm", "mode": "plain"},
+                     {"query": "q1.m_filter", "sf": 1, "cache": "warm", "mode": "plain"}]
+    assert conditions([1], ["warm"], ["plain"], ["q6"]) == conditions([1], ["warm"], ["plain"])
+    cfg = config.load(env={"RESULTS_DIR": str(tmp_path)})
+    path, sh = run_experiment(cfg, "q1.m_scan", conds, blocks=1, seed=1, label="t", dry_run=True)
+    assert path.name.endswith("_q1_t.json")
+    psql = [ln for ln in sh.log if ln.startswith("[psql")]
+    assert any("count(*)" in ln and "l_shipdate" in ln for ln in psql)   # m_filter's text

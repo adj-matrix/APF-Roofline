@@ -32,9 +32,29 @@ RECORDED_SETTINGS = [
 
 
 def query_sql(cfg: Config, query: str) -> str:
-    text = (cfg.repo / "queries" / query / "query.sql").read_text()
+    """`q6` -> queries/q6/query.sql. `q1.m_filter` -> the statement after `-- name: m_filter` in
+    queries/q1/micro.sql (microbenchmark queries that take a query apart)."""
+    base, _, part = query.partition(".")
+    if part:
+        text = micro_statement((cfg.repo / "queries" / base / "micro.sql").read_text(), part)
+    else:
+        text = (cfg.repo / "queries" / query / "query.sql").read_text()
     lines = [ln for ln in text.splitlines() if not ln.lstrip().startswith("--")]
     return "\n".join(lines).strip().rstrip(";")
+
+
+def micro_statement(text: str, name: str) -> str:
+    sections: dict[str, list[str]] = {}
+    current = None
+    for ln in text.splitlines():
+        if ln.startswith("-- name:"):
+            current = ln.split(":", 1)[1].strip()
+            sections[current] = []
+        elif current is not None:
+            sections[current].append(ln)
+    if name not in sections:
+        raise KeyError(f"no '-- name: {name}' section")
+    return "\n".join(sections[name])
 
 
 def run_dir_name(query: str, sf: int, mode: str, cache_state: str, label: str, i: int) -> str:

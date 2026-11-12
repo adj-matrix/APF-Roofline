@@ -38,3 +38,10 @@ def test_query_sql_strips_comments_and_semicolon(cfg):
 def test_rejects_unknown_options(cfg, kw):
     with pytest.raises(ValueError):
         run_query(cfg, "q6", 1, dry_run=True, **kw)
+
+
+def test_micro_statement_sections():
+    from tpch.runner import micro_statement
+    text = "-- header\n-- name: a\nSELECT 1;\n-- name: b\nSELECT 2\nFROM t;\n"
+    assert micro_statement(text, "a").strip() == "SELECT 1;"
+    assert micro_statement(text, "b").strip() == "SELECT 2\nFROM t;"

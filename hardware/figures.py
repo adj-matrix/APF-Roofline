@@ -4,7 +4,8 @@
 
 Uses the newest location scan made with controller-cache eviction (`./tpch bench location`) and
 compares it with every earlier scan, and the newest controller-cache test log.
-Writes fig1_location.png and numbers.json into this directory.
+and the newest memory-latency run (`./tpch bench mem`).
+Writes fig1_location.png, fig2_memory.png and numbers.json into this directory.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from tpch.bench import mem
 from tpch.bench.location import CACHE_HIT_MS, evicted, load_scan, scans
 from tpch.config import Config
 from tpch.report import style
@@ -70,7 +72,35 @@ def collect(cfg: Config) -> dict:
         }
     return {"scan": main_path.parent.name, "cache_hit_ms": CACHE_HIT_MS, "targets": per_target,
             "earlier_scans_evicted": {p.parent.name: evicted(p) for p in paths if p != main_path},
-            "controller_cache_test": _cache_test(cfg), "_main": main}
+            "controller_cache_test": _cache_test(cfg), "memory": _memory(cfg), "_main": main}
+
+
+def _memory(cfg: Config) -> dict:
+    path = mem.latest(cfg)
+    curve = mem.latency_curve(path)
+    return {"run": path.parent.name, "ns_by_size_bytes": curve,
+            "plateaus_ns": {p: {name: c[size] for name, size in
+                                (("L1 (16 KiB)", 1 << 14), ("L2 (128 KiB)", 1 << 17), ("L3 (8 MiB)", 1 << 23),
+                                 ("DRAM (1 GiB)", 1 << 30))} for p, c in curve.items()}}
+
+
+def fig_memory(nums: dict, out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(8, 4.4))
+    for p, color in (("local", style.SERIES[0]), ("remote", style.SERIES[1])):
+        c = nums["memory"]["ns_by_size_bytes"][p]
+        xs = sorted(c)
+        ax.plot([x / 2**20 for x in xs], [c[x] for x in xs], "-o", color=color, markersize=4,
+                label=f"memory on the {'same' if p == 'local' else 'other'} NUMA node ({p})")
+    for size, name in ((32 / 1024, "L1 32 KiB"), (0.25, "L2 256 KiB"), (20, "L3 20 MiB")):
+        ax.axvline(size, color=style.INK_2, linewidth=0.8, linestyle="--")
+        ax.text(size * 1.08, 150, name, fontsize=8, color=style.INK_2)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("working-set size (MiB, log scale)")
+    ax.set_ylabel("latency per dependent random load (ns, log)")
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, borderaxespad=0.2)
+    ax.set_title("Random-access latency: ~15-20 ns inside the LLC, 90-100 ns local DRAM, ~170 ns remote", pad=26)
+    style.save(fig, out / "fig2_memory.png")
 
 
 def fig_location(nums: dict, out: Path) -> None:
@@ -95,6 +125,7 @@ def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | N
     out.mkdir(parents=True, exist_ok=True)
     nums = collect(cfg)
     fig_location(nums, out)
+    fig_memory(nums, out)
     public = {k: v for k, v in nums.items() if not k.startswith("_")}
     (out / "numbers.json").write_text(json.dumps(public, indent=1))
     return public

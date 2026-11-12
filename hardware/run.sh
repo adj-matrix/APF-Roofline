@@ -6,6 +6,8 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 hardware/controller_cache_test.sh       # C1–C4: what the RAID controller cache holds
-./tpch bench location                   # bandwidth vs position; evicts the controller cache first
+./tpch bench location --table 1:orders 1:customer 10:orders 10:customer
+                                        # bandwidth vs position; evicts the controller cache first
+./tpch bench mem                        # random-access latency vs working-set size (CPU only)
 ./tpch report hardware
 # fio block-size sweep: ./tpch bench io (results in report #1, queries/q6/sf10)

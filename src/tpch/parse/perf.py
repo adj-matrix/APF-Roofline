@@ -44,5 +44,7 @@ def perf_metrics(events: dict[str, dict]) -> dict:
         "perf_context_switches": v("context-switches"),
         "perf_cpu_migrations": v("cpu-migrations"),
         "perf_major_faults": v("major-faults"),
+        "perf_llc_loads": v("LLC-loads"),                          # demand loads that missed L2
+        "perf_llc_load_misses": v("LLC-load-misses"),              # ... and also missed L3 (went to DRAM)
         "perf_min_running_pct": min(pcts) if pcts else None,       # < 100: multiplexed, scaled
     }

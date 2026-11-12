@@ -1,0 +1,558 @@
+{
+ "labels": {
+  "cal": "cal",
+  "main": "main"
+ },
+ "location_scan": "20261112-000731_location",
+ "mem_run": "20261112-000154_mem",
+ "bandwidth_MiBps": {
+  "sf1_customer": 93.81254169446296,
+  "sf1_orders": 105.32765737874097,
+  "sf1_lineitem": 176.64845099851328,
+  "sf10_customer": 173.31089426877472,
+  "sf10_orders": 173.69653117684615,
+  "sf10_lineitem": 185.48720697828048
+ },
+ "calibration": {
+  "cycles": 4963879704.0,
+  "GHz": 3.255579482268992,
+  "n": 3,
+  "wait_s_sf1": 0.10973436874441897
+ },
+ "hash_tables_predicted": {
+  "sf1": {
+   "outer_MiB": 8.734893798828125,
+   "inner_MiB": 1.3998260498046875
+  },
+  "sf10": {
+   "outer_MiB": 82.92152404785156,
+   "inner_MiB": 15.454620361328125
+  }
+ },
+ "hash_tables_measured": {
+  "sf1": [
+   {
+    "Node Type": "Aggregate",
+    "Actual Rows": 11620.0,
+    "Plan Rows": 316332,
+    "Hash Buckets": null,
+    "Hash Batches": null,
+    "Peak Memory Usage": 13329,
+    "HashAgg Batches": 1,
+    "Disk Usage": 0
+   },
+   {
+    "Node Type": "Hash",
+    "Actual Rows": 147126.0,
+    "Plan Rows": 146452,
+    "Hash Buckets": 262144,
+    "Hash Batches": 1,
+    "Peak Memory Usage": 8370,
+    "HashAgg Batches": null,
+    "Disk Usage": null
+   },
+   {
+    "Node Type": "Hash",
+    "Actual Rows": 30142.0,
+    "Plan Rows": 30100,
+    "Hash Buckets": 32768,
+    "Hash Batches": 1,
+    "Peak Memory Usage": 1316,
+    "HashAgg Batches": null,
+    "Disk Usage": null
+   }
+  ],
+  "sf10": [
+   {
+    "Node Type": "Aggregate",
+    "Actual Rows": 114003.0,
+    "Plan Rows": 3146666,
+    "Hash Buckets": null,
+    "Hash Batches": null,
+    "Peak Memory Usage": 53265,
+    "HashAgg Batches": 1,
+    "Disk Usage": 0
+   },
+   {
+    "Node Type": "Hash",
+    "Actual Rows": 1461923.0,
+    "Plan Rows": 1480198,
+    "Hash Buckets": 2097152,
+    "Hash Batches": 1,
+    "Peak Memory Usage": 79202,
+    "HashAgg Batches": null,
+    "Disk Usage": null
+   },
+   {
+    "Node Type": "Hash",
+    "Actual Rows": 300276.0,
+    "Plan Rows": 303138,
+    "Hash Buckets": 524288,
+    "Hash Batches": 1,
+    "Peak Memory Usage": 14653,
+    "HashAgg Batches": null,
+    "Disk Usage": null
+   }
+  ]
+ },
+ "cells": {
+  "sf1_cold": {
+   "wall_s": {
+    "median": 7.684282064437866,
+    "min": 7.633654594421387,
+    "max": 7.7827746868133545,
+    "n": 5
+   },
+   "GHz": {
+    "median": 2.211913470044474,
+    "min": 2.155110488224216,
+    "max": 2.2520907317480545,
+    "n": 5
+   },
+   "cycles": {
+    "median": 7281189503.0,
+    "min": 7186187455.0,
+    "max": 7357999780.0,
+    "n": 5
+   },
+   "cycles_per_lineitem_tuple": {
+    "median": 1213.2858934399117,
+    "min": 1197.455424443217,
+    "max": 1226.0850144512403,
+    "n": 5
+   },
+   "llc_load_misses": {
+    "median": 19492301.0,
+    "min": 2346233.0,
+    "max": 19610685.0,
+    "n": 5
+   },
+   "perf_cpu_s": {
+    "median": 3.2940500000000004,
+    "min": 3.2330799999999997,
+    "max": 3.41421,
+    "n": 5
+   },
+   "ipc": {
+    "median": 1.3964644624675209,
+    "min": 1.3809897929896378,
+    "max": 1.4140362059341798,
+    "n": 5
+   },
+   "pred_io_by_table_s": {
+    "customer": 0.2998,
+    "orders": 1.938593386405389,
+    "lineitem": 4.97788648883992
+   },
+   "pred_s": 7.216279875245309,
+   "err": {
+    "median": 0.06485366383834279,
+    "min": 0.05783793400361836,
+    "max": 0.07850233380101379,
+    "n": 5
+   },
+   "dev_MiBps": {
+    "median": 144.76079914452944,
+    "min": 142.96244925799988,
+    "max": 145.7208731074786,
+    "n": 5
+   },
+   "dev_r_await_ms": {
+    "median": 1.256900212314225,
+    "min": 1.2422281167108753,
+    "max": 1.2840186519711743,
+    "n": 5
+   },
+   "dev_read_MiB": {
+    "median": 1112.3828125,
+    "min": 1112.36328125,
+    "max": 1112.64453125,
+    "n": 5
+   }
+  },
+  "sf1_warm": {
+   "wall_s": {
+    "median": 1.4984068870544434,
+    "min": 1.4449400901794434,
+    "max": 1.8138971328735352,
+    "n": 5
+   },
+   "GHz": {
+    "median": 3.391628133027745,
+    "min": 2.782966086094117,
+    "max": 3.4083907283790764,
+    "n": 5
+   },
+   "cycles": {
+    "median": 5080444968.0,
+    "min": 4898223266.0,
+    "max": 5153887554.0,
+    "n": 5
+   },
+   "cycles_per_lineitem_tuple": {
+    "median": 846.5693976969663,
+    "min": 816.2052627676229,
+    "max": 858.8073505115215,
+    "n": 5
+   },
+   "llc_load_misses": {
+    "median": 16682308.0,
+    "min": 16500095.0,
+    "max": 17052786.0,
+    "n": 5
+   },
+   "perf_cpu_s": {
+    "median": 1.4978900000000002,
+    "min": 1.44421,
+    "max": 1.8131400000000002,
+    "n": 5
+   },
+   "ipc": {
+    "median": 1.6952028877876824,
+    "min": 1.633692863839303,
+    "max": 1.7245701377238978,
+    "n": 5
+   },
+   "pred_s": {
+    "median": 1.4635683834738946,
+    "min": 1.4563704984494736,
+    "max": 1.7836651796812901,
+    "n": 5
+   },
+   "err": {
+    "median": 0.023876292613096872,
+    "min": -0.012727996521922358,
+    "max": 0.03871165844976132,
+    "n": 5
+   }
+  },
+  "sf10_cold": {
+   "wall_s": {
+    "median": 61.438841819763184,
+    "min": 61.24757647514343,
+    "max": 61.90929079055786,
+    "n": 5
+   },
+   "GHz": {
+    "median": 2.8484150767320955,
+    "min": 2.7871976545104604,
+    "max": 2.8918200562223118,
+    "n": 5
+   },
+   "cycles": {
+    "median": 72370336990.0,
+    "min": 71371343764.0,
+    "max": 73478724534.0,
+    "n": 5
+   },
+   "cycles_per_lineitem_tuple": {
+    "median": 1206.4527432143725,
+    "min": 1189.7989846706364,
+    "max": 1224.9301643322017,
+    "n": 5
+   },
+   "llc_load_misses": {
+    "median": 203453990.0,
+    "min": 122834112.0,
+    "max": 203571191.0,
+    "n": 5
+   },
+   "perf_cpu_s": {
+    "median": 25.409080000000003,
+    "min": 24.83,
+    "max": 26.36294,
+    "n": 5
+   },
+   "ipc": {
+    "median": 1.3500475889935468,
+    "min": 1.3302772334292572,
+    "max": 1.3695026017753373,
+    "n": 5
+   },
+   "pred_io_by_table_s": {
+    "customer": 1.6197409354120267,
+    "orders": 11.748039734440088,
+    "lineitem": 47.38180542569229
+   },
+   "pred_s": 60.74958609554441,
+   "err": {
+    "median": 0.011345850540195324,
+    "min": 0.008197428354751457,
+    "max": 0.019089919282569534,
+    "n": 5
+   },
+   "dev_MiBps": {
+    "median": 180.89775308760596,
+    "min": 179.52494006675164,
+    "max": 181.40628498189048,
+    "n": 5
+   },
+   "dev_r_await_ms": {
+    "median": 1.077554581245526,
+    "min": 1.0554499082733009,
+    "max": 1.146737248858065,
+    "n": 5
+   },
+   "dev_read_MiB": {
+    "median": 11110.76171875,
+    "min": 11110.31640625,
+    "max": 11114.26171875,
+    "n": 5
+   }
+  },
+  "sf10_warm": {
+   "wall_s": {
+    "median": 16.6846284866333,
+    "min": 16.45818328857422,
+    "max": 17.07589602470398,
+    "n": 5
+   },
+   "GHz": {
+    "median": 3.403542901000869,
+    "min": 3.350911298524369,
+    "max": 3.4808360994773655,
+    "n": 5
+   },
+   "cycles": {
+    "median": 56933754914.0,
+    "min": 56007680916.0,
+    "max": 58070057672.0,
+    "n": 5
+   },
+   "cycles_per_lineitem_tuple": {
+    "median": 949.1165531947327,
+    "min": 933.6783977048531,
+    "max": 968.0593360603228,
+    "n": 5
+   },
+   "llc_load_misses": {
+    "median": 201005835.0,
+    "min": 199917927.0,
+    "max": 201936687.0,
+    "n": 5
+   },
+   "perf_cpu_s": {
+    "median": 16.68279,
+    "min": 16.4557,
+    "max": 17.07338,
+    "n": 5
+   },
+   "ipc": {
+    "median": 1.5466302394651426,
+    "min": 1.5286334136893636,
+    "max": 1.6033383814387963,
+    "n": 5
+   },
+   "pred_linear_s": {
+    "median": 14.584448759380374,
+    "min": 14.260595908969423,
+    "max": 14.813521641667831,
+    "n": 5
+   },
+   "err_linear": {
+    "median": 0.1471022891934095,
+    "min": 0.12847482685889666,
+    "max": 0.16998115598656338,
+    "n": 5
+   },
+   "pred_local_s": {
+    "median": 20.040863873008778,
+    "min": 19.717011022621136,
+    "max": 20.26993675527975,
+    "n": 5
+   },
+   "err_local": {
+    "median": -0.1652051752981165,
+    "min": -0.17876877000595504,
+    "max": -0.1537952447512867,
+    "n": 5
+   },
+   "pred_remote_s": {
+    "median": 24.025565038727017,
+    "min": 23.70171218833937,
+    "max": 24.254637920997986,
+    "n": 5
+   },
+   "err_remote": {
+    "median": -0.3036551656775457,
+    "min": -0.31497206155005597,
+    "max": -0.29597398731230484,
+    "n": 5
+   },
+   "pred_v2_s": {
+    "median": 17.838279302188123,
+    "min": 17.51442645179692,
+    "max": 18.067352184461612,
+    "n": 5
+   },
+   "err_v2": {
+    "median": -0.06213160797630235,
+    "min": -0.07736710420520299,
+    "max": -0.047377969666742015,
+    "n": 5
+   }
+  }
+ },
+ "nonlinear": {
+  "sf1_warm_cycles_main": 5080444968.0,
+  "sf1_warm_GHz_main": 3.391628133027745,
+  "measured_wait_s": {
+   "median": 2.896524376841807,
+   "min": 2.624754615112094,
+   "max": 3.158375996568294,
+   "n": 5
+  },
+  "predicted_wait_s": {
+   "local": 5.456415114678045,
+   "remote": 9.441116280396283
+  },
+  "v2_wait_s": 3.2538305436969943,
+  "ns_per_extra_llc_miss": {
+   "median": 82.49008359755827,
+   "min": 79.31006948338798,
+   "max": 92.39676546165732,
+   "n": 5
+  },
+  "v2_extra_misses_per_outer_probe": 0.7910298067821421,
+  "hash_loads_sf10": 66338761.63096523,
+  "ns_per_hash_load": {
+   "median": 43.66262356470917,
+   "min": 39.56592722838718,
+   "max": 47.609812407080646,
+   "n": 5
+  },
+  "extra_llc_misses": {
+   "median": 34182755.0,
+   "min": 33094847.0,
+   "max": 35113607.0,
+   "n": 5
+  },
+  "extra_llc_misses_per_outer_probe": {
+   "median": 1.0571686369716322,
+   "min": 1.023522951668896,
+   "max": 1.085957057918461,
+   "n": 5
+  },
+  "predicted_loads_per_outer_probe": 1.697099208831787,
+  "latency_at_outer_hash_ns": {
+   "local": 93.38452344184812,
+   "remote": 164.09981528573093
+  }
+ },
+ "analyze": {
+  "sf1_warm": {
+   "wall_s": 2.113401174545288,
+   "phases": {
+    "customer scan + hash": {
+     "self_s": 0.032604999999999995,
+     "io_read_s": 0.0
+    },
+    "orders scan + join + hash": {
+     "self_s": 0.6418519999999999,
+     "io_read_s": 0.0
+    },
+    "lineitem scan": {
+     "self_s": 1.064775,
+     "io_read_s": 0.30526600000000004
+    },
+    "probe outer hash": {
+     "self_s": 0.3298740000000003,
+     "io_read_s": 0.0
+    },
+    "aggregate + sort": {
+     "self_s": 0.03845599999999968,
+     "io_read_s": 0.0
+    }
+   }
+  },
+  "sf10_cold": {
+   "wall_s": 62.335744857788086,
+   "phases": {
+    "customer scan + hash": {
+     "self_s": 1.626869,
+     "io_read_s": 1.283475
+    },
+    "orders scan + join + hash": {
+     "self_s": 12.460716999999999,
+     "io_read_s": 6.482705999999999
+    },
+    "lineitem scan": {
+     "self_s": 42.043371,
+     "io_read_s": 30.508182
+    },
+    "probe outer hash": {
+     "self_s": 5.388053000000007,
+     "io_read_s": -9.99999996565748e-07
+    },
+    "aggregate + sort": {
+     "self_s": 0.6431569999999992,
+     "io_read_s": 0.0
+    }
+   }
+  },
+  "sf10_warm": {
+   "wall_s": 19.420554876327515,
+   "phases": {
+    "customer scan + hash": {
+     "self_s": 0.65661,
+     "io_read_s": 0.16375299999999998
+    },
+    "orders scan + join + hash": {
+     "self_s": 4.2090179999999995,
+     "io_read_s": 0.7093650000000001
+    },
+    "lineitem scan": {
+     "self_s": 10.463246999999999,
+     "io_read_s": 2.945713
+    },
+    "probe outer hash": {
+     "self_s": 3.738685000000001,
+     "io_read_s": -1.0000000002037268e-06
+    },
+    "aggregate + sort": {
+     "self_s": 0.34960299999999916,
+     "io_read_s": 0.0
+    }
+   }
+  },
+  "sf1_cold": {
+   "wall_s": 7.763826847076416,
+   "phases": {
+    "customer scan + hash": {
+     "self_s": 0.31474099999999994,
+     "io_read_s": 0.243461
+    },
+    "orders scan + join + hash": {
+     "self_s": 2.067207,
+     "io_read_s": 1.320754
+    },
+    "lineitem scan": {
+     "self_s": 4.773749,
+     "io_read_s": 3.754841
+    },
+    "probe outer hash": {
+     "self_s": 0.38769300000000023,
+     "io_read_s": -9.999999992942322e-07
+    },
+    "aggregate + sort": {
+     "self_s": 0.04997199999999975,
+     "io_read_s": 0.0
+    }
+   }
+  }
+ },
+ "q6_warm_cycles_per_tuple": {
+  "1": {
+   "median": 605.103030969562,
+   "min": 577.1238464210998,
+   "max": 610.1269916175307,
+   "n": 5
+  },
+  "10": {
+   "median": 607.767207250112,
+   "min": 584.8801396364609,
+   "max": 655.7624542118558,
+   "n": 5
+  }
+ }
+}

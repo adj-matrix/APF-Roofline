@@ -20,38 +20,30 @@ import matplotlib.pyplot as plt
 from tpch.bench import location
 from tpch.config import Config
 from tpch.model.common import HwParams, TableStats
-from tpch.report import style
+from tpch.report import data, style
 
 from queries.q6.model import predict_q6
 
 TUPLES = {1: 6_001_215, 10: 59_986_052}          # exact count(*) of lineitem
 PAGES = {1: 112_555, 10: 1_124_956}               # after VACUUM FULL
 FILES = {1: "16384/16632", 10: "16506/16628"}     # relfilenode paths under base/ (location scan)
+SCAN = "20261111-184649_location"                 # first location scan with controller-cache eviction
 SF_COLOR = {10: style.SERIES[0], 1: style.SERIES[1]}
 EARLY_COLOR = style.SERIES[2]                      # SF1 runs before device-cache eviction
 
 
 def _stats(xs: list[float]) -> dict:
-    xs = [x for x in xs if x is not None]
-    return {"median": st.median(xs), "min": min(xs), "max": max(xs), "n": len(xs)} if xs else {}
+    return data.stats(xs)
 
 
 def _experiment_runs(cfg: Config, label: str) -> list[dict]:
-    root = cfg.repo / cfg.RESULTS_DIR
-    out = []
-    for f in sorted((root / "experiments").glob(f"*_q6_{label}.json")):
-        doc = json.loads(f.read_text())
-        for o in doc["order"]:
-            s = json.loads((root / "runs" / o["run"] / "summary.json").read_text())
-            s.update(position=o["position"], prev=o["prev"], experiment=doc["experiment"],
-                     evicted=doc.get("device_cache_evicted_GiB", 0))
-            out.append(s)
-    return out
+    return data.experiment_runs(cfg, "q6", label)
 
 
 def _table_bandwidth(cfg: Config) -> tuple[str, dict[int, float]]:
-    """MiB/s at each lineitem's own location, from the newest evicted location scan."""
-    path = [p for p in location.scans(cfg) if location.evicted(p)][-1]
+    """MiB/s at each lineitem's own location, from the location scan this report used (pinned:
+    later scans would shift the numbers by < 1 % and break the report's tables)."""
+    path = next(p for p in location.scans(cfg) if p.parent.name == SCAN)
     rows = location.load_scan(path)
     return path.parent.name, {sf: location.table_bandwidth(rows, f) for sf, f in FILES.items()}
 
