@@ -15,14 +15,22 @@ from __future__ import annotations
 import os
 import time
 
+from . import sysconf
 from .config import Config
 from .shell import Shell, root_prefix
 
 
-def pg_ctl(cfg: Config, sh: Shell, *args: str) -> None:
+def pg_ctl(cfg: Config, sh: Shell, *args: str, bind: bool | None = None) -> None:
+    """bind: None = as SYSCONF says (pgnuma knob), True/False = force. A started postmaster
+    inherits numactl's CPU and memory policy, and so do all its backends."""
     cmd = [f"{cfg.PGBIN}/pg_ctl", "-D", cfg.PGDATA, "-l", f"{cfg.DATA_ROOT}/postgres.log", "-w", *args]
     if os.geteuid() == 0:  # docker: the cluster belongs to the postgres OS user
         cmd = ["runuser", "-u", "postgres", "--", *cmd]
+    node = sysconf.pg_numa_node(cfg) if bind is not False else None
+    if bind and node is None:
+        node = cfg.values.get("PG_NUMA_NODE") or None
+    if node is not None:
+        cmd = ["numactl", f"--cpunodebind={node}", f"--membind={node}", *cmd]
     sh.run(cmd)
 
 

@@ -18,11 +18,11 @@ from tpch.config import Config
 from tpch.report import style
 from tpch.report.data import experiment_runs, stats
 
-SCAN = "20261112-000731_location"      # bandwidth used in prediction.md
+SCAN = "20261112-000731_location"      # bandwidth used in docs/3-q1-prediction.md
 LINEITEM = {1: 6_001_215, 10: 59_986_052}
 MIB = {1: 112_555 * 8192 / 2**20, 10: 1_124_956 * 8192 / 2**20}
 FILES = {1: "16384/16632", 10: "16506/16628"}
-KERNEL_COLD = 210.0                    # cycles/tuple, cold - warm, Q6 (prediction.md A3)
+KERNEL_COLD = 210.0                    # cycles/tuple, cold - warm, Q6 (docs/3-q1-prediction.md A3)
 SF_COLOR = {10: style.SERIES[0], 1: style.SERIES[1]}
 # Q1's pieces: (label, statement, base statement, how many times Q1 contains it)
 PIECES = [("scan, count(*)", "m_scan", None, 1), ("read columns + filter", "m_filter", "m_scan", 1),

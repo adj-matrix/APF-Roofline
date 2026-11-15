@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Q6 × SF1, together with SF10 in the same experiment: does the SF10 model scale down to SF1?
-# Prediction and hypotheses: prediction.md (written before the first experiment).
+# Prediction and hypotheses: docs/1-q6-sf1-prediction.md (written before the first experiment).
 #
 # Design: randomized blocks (src/tpch/experiment.py). Each experiment evicts the RAID
 # controller's write-back cache before its first cold run.

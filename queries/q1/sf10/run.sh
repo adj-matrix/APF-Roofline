@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Q1 × SF1 and SF10 in the same experiments: CPU-heavy scan; is its cost the sum of its pieces?
-# Prediction (written before measuring): prediction.md. Pieces: queries/q1/micro.sql (label micro).
+# Prediction (written before measuring): docs/3-q1-prediction.md. Pieces: queries/q1/micro.sql (label micro).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 LABEL=${LABEL:-main}

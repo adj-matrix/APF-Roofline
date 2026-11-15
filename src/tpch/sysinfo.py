@@ -5,6 +5,7 @@ import platform
 import subprocess
 from pathlib import Path
 
+from . import sysconf
 from .config import REPO
 
 
@@ -36,6 +37,34 @@ def _meminfo_kb(key: str) -> int | None:
     return None
 
 
+def _disk_cache_types() -> dict[str, str | None]:
+    """'write back' / 'write through' per block device, as the RAID controller reports it."""
+    out = {}
+    for d in sorted(Path("/sys/class/scsi_disk").glob("*")):
+        blocks = list((d / "device" / "block").glob("*"))
+        if blocks:
+            out[blocks[0].name] = _read(str(d / "cache_type"))
+    return out
+
+
+def _postmaster_affinity() -> dict | None:
+    """CPUs and memory nodes the running postmaster (and so every backend) may use."""
+    try:
+        from .config import load
+        pid = Path(load().PGDATA, "postmaster.pid").read_text().split()[0]
+    except (OSError, IndexError, AttributeError):
+        return None
+    out = {"pid": int(pid)}
+    for line in (_read(f"/proc/{pid}/status") or "").splitlines():
+        k, _, v = line.partition(":")
+        if k == "Cpus_allowed_list":
+            out["cpus"] = v.strip()
+    # numactl --membind sets a memory policy (not a cpuset), visible per mapping in numa_maps
+    policies = {line.split()[1] for line in (_read(f"/proc/{pid}/numa_maps") or "").splitlines() if line.strip()}
+    out["mempolicy"] = ",".join(sorted(policies)) or None
+    return out
+
+
 def collect() -> dict:
     return {
         "host": platform.node(),
@@ -46,6 +75,9 @@ def collect() -> dict:
         "governor": _read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"),
         "no_turbo": _read("/sys/devices/system/cpu/intel_pstate/no_turbo"),
         "thp": _read("/sys/kernel/mm/transparent_hugepage/enabled"),
+        **sysconf.state(),                  # nmi_watchdog, timers_active (see sysconf.py)
+        "postmaster": _postmaster_affinity(),
+        "disk_cache_type": _disk_cache_types(),
         "mem_total_kb": _meminfo_kb("MemTotal"),
         "git_commit": _cmd("git", "rev-parse", "HEAD", cwd=REPO),
         "git_dirty": bool(_cmd("git", "status", "--porcelain", cwd=REPO)),

@@ -3,7 +3,7 @@
     ./tpch report q3/sf10 --cond cal=cal --cond main=main
 
 `cal` = the SF1 warm calibration runs (before the prediction's part B); `main` = the experiment.
-Device bandwidth and memory latency come from hardware/ (pinned to the runs prediction.md used).
+Device bandwidth and memory latency come from hardware/ (pinned to the runs docs/2-q3-prediction.md used).
 Writes fig1_prediction.png .. fig4_wait.png and numbers.json into this directory.
 """
 from __future__ import annotations
@@ -21,8 +21,8 @@ from tpch.report.data import experiment_runs, stats
 
 from queries.q3.model import HashTable, io_seconds, probe_ns, probe_ns_split, warm_seconds_scaled
 
-SCAN = "20261112-000731_location"      # location scan with orders/customer (prediction.md)
-MEM = "20261112-000154_mem"            # memory-latency run (prediction.md)
+SCAN = "20261112-000731_location"      # location scan with orders/customer (docs/2-q3-prediction.md)
+MEM = "20261112-000154_mem"            # memory-latency run (docs/2-q3-prediction.md)
 SF_COLOR = {10: style.SERIES[0], 1: style.SERIES[1]}
 PAGES = {(1, "customer"): 3600, (1, "orders"): 26136, (1, "lineitem"): 112555,
          (10, "customer"): 35932, (10, "orders"): 261196, (10, "lineitem"): 1124956}

@@ -6,7 +6,10 @@ import json
 import sys
 from pathlib import Path
 
-from . import config, sysinfo
+from contextlib import nullcontext
+
+from . import config, sysconf, sysinfo
+from .shell import Shell
 from .runner import CACHES, MODES, run_query
 from .summarize import summarize
 
@@ -71,8 +74,22 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--timeline", nargs="+", help="condition names drawn in the timeline figure (max 3)")
 
     sub.add_parser("sysinfo", help="print the environment snapshot")
+    sc = sub.add_parser("sysconf", help="system settings changed during measurements (SYSCONF in config.env)")
+    sc.add_argument("action", choices=["show", "restore"],
+                    help="show: current state; restore: undo the settings of a killed command")
 
     a = p.parse_args(argv)
+    # Measuring commands change SYSCONF's settings when they start and restore them when they end.
+    measuring = a.cmd in ("run", "experiment", "bench")
+    sys_sh = Shell(getattr(a, "dry_run", False))
+    with sysconf.applied(config.load(), sys_sh) if measuring else nullcontext():
+        _dispatch(a)
+    if measuring and sys_sh.log:
+        print("system settings (applied, then restored):\n  " + "\n  ".join(sys_sh.log))
+    return 0
+
+
+def _dispatch(a: argparse.Namespace) -> None:
     if a.cmd == "run":
         cfg = config.load()
         runs, sh = run_query(cfg, a.query, a.sf, a.cache, a.mode, a.label, a.repeat,
@@ -137,7 +154,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"figures + numbers.json in {a.out}")
     elif a.cmd == "sysinfo":
         print(json.dumps(sysinfo.collect(), indent=2))
-    return 0
+    elif a.cmd == "sysconf":
+        cfg = config.load()
+        if a.action == "show":
+            print(json.dumps({"SYSCONF": sysconf.knobs(cfg), **sysconf.state(cfg)}, indent=2))
+        else:
+            sh = Shell()
+            doc = sysconf.restore_interrupted(cfg, sh)
+            print("nothing to restore" if doc is None else "restored:\n  " + "\n  ".join(sh.log))
 
 
 if __name__ == "__main__":

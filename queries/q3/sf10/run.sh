@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Q3 × SF1 and SF10 in the same experiments: does Q3 scale linearly like Q6?
-# Prediction (written before measuring): prediction.md. Calibration: label `cal` (SF1 warm only).
+# Prediction (written before measuring): docs/2-q3-prediction.md. Calibration: label `cal` (SF1 warm only).
 # Device and memory parameters: hardware/ (./tpch bench location, ./tpch bench mem).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
