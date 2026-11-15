@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 
 from . import sysconf
 from .config import Config
@@ -31,6 +32,11 @@ def pg_ctl(cfg: Config, sh: Shell, *args: str, bind: bool | None = None) -> None
         node = cfg.values.get("PG_NUMA_NODE") or None
     if node is not None:
         cmd = ["numactl", f"--cpunodebind={node}", f"--membind={node}", *cmd]
+    if {"start", "restart"} & set(args) and Path("/run/systemd/system").is_dir() and os.geteuid() != 0:
+        # The postmaster gets its own scope. Started from a detached job (src/setup/detach.sh), it
+        # would otherwise live in the job's unit and be killed when the job ends.
+        cmd = [*root_prefix(), "systemd-run", "--scope", "--quiet", f"--unit=tpch-postgres-{time.time_ns()}",
+               f"--uid={os.getuid()}", f"--gid={os.getgid()}", "--", *cmd]
     sh.run(cmd)
 
 
@@ -45,22 +51,26 @@ def make_cold(cfg: Config, sh: Shell) -> None:
     pg_ctl(cfg, sh, "start")
 
 
-def evict_device_cache_cmds(cfg: Config) -> tuple[list[str], list[str]]:
-    """(write, delete) commands for the scratch file under DATA_ROOT/bench (a file, never a device)."""
-    path = f"{cfg.DATA_ROOT}/bench/evict.tmp"
+def evict_device_cache_cmds(cfg: Config, root: str | None = None) -> tuple[list[str], list[str]]:
+    """(write, delete) commands for the scratch file under <root>/bench (a file, never a device).
+    root: the volume whose data is about to be read (default DATA_ROOT)."""
+    path = f"{root or cfg.DATA_ROOT}/bench/evict.tmp"
     mib = cfg.int("DEVICE_CACHE_EVICT_GIB") * 1024
     write = ["dd", "if=/dev/zero", f"of={path}", "bs=1M", f"count={mib}", "oflag=direct", "conv=fsync",
              "status=none"]
     return write, ["rm", "-f", path]
 
 
-def evict_device_cache(cfg: Config, sh: Shell) -> None:
+def evict_device_cache(cfg: Config, sh: Shell, roots: list[str] | None = None) -> None:
+    """Evict before reading the volumes in `roots` (default: DATA_ROOT). The write goes to each of
+    them, so it works whether the controller cache is shared between virtual disks or not."""
     if cfg.int("DEVICE_CACHE_EVICT_GIB") <= 0:
         return
-    write, delete = evict_device_cache_cmds(cfg)
-    sh.run(["mkdir", "-p", f"{cfg.DATA_ROOT}/bench"])
-    sh.run(write)
-    sh.run(delete)
+    for root in dict.fromkeys(roots or [cfg.DATA_ROOT]):
+        write, delete = evict_device_cache_cmds(cfg, root)
+        sh.run(["mkdir", "-p", f"{root}/bench"])
+        sh.run(write)
+        sh.run(delete)
     # The controller destages the last written data in the background (invisible to the OS);
     # reads right after compete with it (measured: 106 instead of 185 MB/s). Wait it out.
     settle = cfg.int("DEVICE_CACHE_SETTLE_S")

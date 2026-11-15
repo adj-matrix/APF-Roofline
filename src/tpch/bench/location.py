@@ -18,6 +18,7 @@ Pieces under CACHE_HIT_MS are flagged and excluded from table_bandwidth.
 
     ./tpch bench location                         # fio file + lineitem of every loaded SF
     ./tpch bench location --table 1:orders --file /srv/tpch/bench/fio.dat --no-default
+    ./tpch bench location --no-default --table 100:lineitem    # SF100: sdb (each file -> its volume)
 
 Output: results/bench/<stamp>_location/{location.csv, meta.json}
 """
@@ -40,6 +41,10 @@ CHUNK = 512 * 2**20
 BS = 128 * 1024
 FS_BLOCK = 4096
 CACHE_HIT_MS = 0.3          # between ~0.1 ms (controller cache) and >= 0.6 ms (disk) per 128 KiB request
+# The latency rule holds only where a disk-served sequential read is slow: sda. On sdb the controller
+# serves sequential reads from its read-ahead at ~0.1 ms per 128 KiB too (2026-11-14 scan), so a
+# write-back-cache hit cannot be told apart by latency there: its pieces are never flagged.
+CACHE_HIT_DEVICES = ("sda",)
 COLUMNS = ["target", "file", "offset_bytes", "bytes", "phys_GiB", "seconds", "MiBps",
            "dev_reads", "r_await_ms", "cache_hit"]
 
@@ -93,21 +98,24 @@ def relation_files(cfg: Config, sf: int, table: str) -> list[str]:
 
 
 def default_targets(cfg: Config) -> list[tuple[str, list[str]]]:
-    fio = Path(cfg.DATA_ROOT) / "bench" / "fio.dat"
-    out = [("fio.dat", [str(fio)])] if fio.exists() else []
+    out = []
+    for vol in ("data", "big") if cfg.values.get("BIG_ROOT") else ("data",):
+        fio = Path(cfg.volume(vol)[0]) / "bench" / "fio.dat"
+        if fio.exists():
+            out.append(("fio.dat" if vol == "data" else "fio.dat@big", [str(fio)]))
     return out + [(f"sf{sf}.lineitem", relation_files(cfg, sf, "lineitem")) for sf in cfg.sfs]
 
 
 # --- measurement -----------------------------------------------------------------------------
 
 def piece_row(target: str, path: str, offset: int, length: int, phys: float, seconds: float,
-              disk: dict[str, int]) -> dict:
+              disk: dict[str, int], flag_hits: bool = True) -> dict:
     r_await = disk["read_ms"] / disk["reads"] if disk["reads"] else None
     return {"target": target, "file": path, "offset_bytes": offset, "bytes": length,
             "phys_GiB": round(phys / 2**30, 3), "seconds": round(seconds, 4),
             "MiBps": round(length / 2**20 / seconds, 1), "dev_reads": disk["reads"],
             "r_await_ms": None if r_await is None else round(r_await, 3),
-            "cache_hit": int(r_await is not None and r_await < CACHE_HIT_MS)}
+            "cache_hit": int(flag_hits and r_await is not None and r_await < CACHE_HIT_MS)}
 
 
 def _disk(device: str) -> dict[str, int]:
@@ -118,7 +126,10 @@ def run_location_bench(cfg: Config, targets: list[tuple[str, list[str]]],
                        dry_run: bool = False) -> tuple[Path, Shell]:
     sh = Shell(dry_run)
     out = cfg.repo / cfg.RESULTS_DIR / "bench" / f"{datetime.now():%Y%m%d-%H%M%S}_location"
-    cache.evict_device_cache(cfg, sh)
+    # each file is timed against the device of its own volume (SF100 tables: sdb via pg_tblspc)
+    vols = {path: cfg.volume_of(path) for _, files in targets for path in files}
+    roots = sorted({root for root, _ in vols.values()})
+    cache.evict_device_cache(cfg, sh, roots)
     if dry_run:
         for _, files in targets:
             for path in files:
@@ -135,12 +146,14 @@ def run_location_bench(cfg: Config, targets: list[tuple[str, list[str]]],
             for path in files:
                 ex = parse_filefrag(subprocess.run(["filefrag", "-v", "-b4096", path], capture_output=True,
                                                    text=True, check=True).stdout)
+                dev = vols[path][1]
                 for off, n in pieces(Path(path).stat().st_size):
-                    d0, t0 = _disk(cfg.IO_DEVICE), time.perf_counter()
+                    d0, t0 = _disk(dev), time.perf_counter()
                     sh.run(dd_cmd(path, off, n))
-                    s, d1 = time.perf_counter() - t0, _disk(cfg.IO_DEVICE)
+                    s, d1 = time.perf_counter() - t0, _disk(dev)
                     row = piece_row(target, path, off, n, mean_physical(ex, off, off + n), s,
-                                    {k: d1[k] - d0[k] for k in ("reads", "read_ms")})
+                                    {k: d1[k] - d0[k] for k in ("reads", "read_ms")},
+                                    flag_hits=dev in CACHE_HIT_DEVICES)
                     rows.append(row)
                     w.writerow(row)
                     f.flush()
@@ -148,7 +161,8 @@ def run_location_bench(cfg: Config, targets: list[tuple[str, list[str]]],
                           f"{row['MiBps']:6.1f} MiB/s  {row['r_await_ms']} ms/req"
                           + ("  CONTROLLER CACHE HIT" if row["cache_hit"] else ""), flush=True)
     (out / "meta.json").write_text(json.dumps({
-        "targets": {t: files for t, files in targets}, "device": cfg.IO_DEVICE,
+        "targets": {t: files for t, files in targets},
+        "device": {path: dev for path, (_, dev) in vols.items()}, "device_cache_evicted_on": roots,
         "chunk_bytes": CHUNK, "bs": BS, "cache_hit_ms": CACHE_HIT_MS,
         "device_cache_evicted_GiB": cfg.int("DEVICE_CACHE_EVICT_GIB"),
         "device_cache_settle_s": cfg.int("DEVICE_CACHE_SETTLE_S"),
@@ -165,14 +179,20 @@ def scans(cfg: Config) -> list[Path]:
 
 
 def load_scan(path: Path) -> list[dict]:
-    """Rows of one scan. Scans before eviction existed have no target/r_await columns."""
+    """Rows of one scan. Scans before eviction existed have no target/r_await columns. A piece on a
+    device outside CACHE_HIT_DEVICES (meta.json "device") is never a cache hit, whatever the csv says
+    (the first sdb scan, 2026-11-14 17:22, flagged every piece)."""
+    meta = path.parent / "meta.json"
+    devices = json.loads(meta.read_text()).get("device") if meta.exists() else None
+    devices = devices if isinstance(devices, dict) else {}
     rows = []
     for r in csv.DictReader(open(path)):
         rows.append({"target": r.get("target") or None, "file": r["file"], "bytes": int(r["bytes"]),
                      "phys_GiB": float(r["phys_GiB"]), "seconds": float(r["seconds"]),
                      "MiBps": float(r["MiBps"]),
                      "r_await_ms": float(r["r_await_ms"]) if r.get("r_await_ms") else None,
-                     "cache_hit": r.get("cache_hit") == "1"})
+                     "cache_hit": r.get("cache_hit") == "1"
+                                  and devices.get(r["file"], CACHE_HIT_DEVICES[0]) in CACHE_HIT_DEVICES})
     return rows
 
 

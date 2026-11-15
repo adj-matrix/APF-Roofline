@@ -133,8 +133,11 @@ stage_cluster() {
   fi
 }
 
-gen_sf() {  # generate $TBL_DIR/sf<N>/*.tbl*
-  local sf=$1 out="$TBL_DIR/sf$1" jobs=$GEN_JOBS
+big() { (( $1 >= BIG_SF_MIN )); }
+tbl_dir() { if big "$1"; then echo "$BIG_ROOT/tbl/sf$1"; else echo "$TBL_DIR/sf$1"; fi; }
+
+gen_sf() {  # generate $(tbl_dir N)/*.tbl*
+  local sf=$1 out; out=$(tbl_dir "$1"); local jobs=$GEN_JOBS
   [[ -x "$DBGEN_DIR/dbgen" ]] || die "dbgen not built; run the 'dbgen' stage"
   if [[ -f "$out/.done" ]]; then log "SF$sf: tbl files already generated"; return; fi
   (( sf > 1 )) || jobs=1
@@ -153,24 +156,46 @@ gen_sf() {  # generate $TBL_DIR/sf<N>/*.tbl*
   printf 'sf=%s jobs=%s dbgen_commit=%s\n' "$sf" "$jobs" "$DBGEN_COMMIT" > "$out/.done"
 }
 
-load_sf() {  # load $TBL_DIR/sf<N> into database tpch_sf<N>
-  local sf=$1 db="tpch_sf$1" out="$TBL_DIR/sf$1"
+load_sf() {  # load $(tbl_dir N) into database tpch_sf<N>
+  local sf=$1 db="tpch_sf$1" out; out=$(tbl_dir "$1")
   pg_running || die "PostgreSQL not running; run the 'cluster' stage"
   if [[ "$(pg -d "$db" -Atc "SELECT value FROM tpch_meta WHERE key='loaded'" 2>/dev/null || true)" == "true" ]]; then
     log "SF$sf: database $db already loaded"; return
   fi
   log "SF$sf: (re)creating database $db"
-  pg -d postgres -c "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db"
+  pg -d postgres -c "DROP DATABASE IF EXISTS $db"
+  if big "$sf"; then
+    as_pg mkdir -p "$BIG_ROOT/pg"
+    [[ "$(pg -d postgres -Atc "SELECT 1 FROM pg_tablespace WHERE spcname='tpch_big'")" == 1 ]] \
+      || pg -d postgres -c "CREATE TABLESPACE tpch_big LOCATION '$BIG_ROOT/pg'"
+    # Temp files (sorts for the PK builds, hash spills at query time) go there too, not to the root LV.
+    pg -d postgres -c "CREATE DATABASE $db TABLESPACE tpch_big" \
+                   -c "ALTER DATABASE $db SET temp_tablespaces = 'tpch_big'"
+  else
+    pg -d postgres -c "CREATE DATABASE $db"
+  fi
   pg -d "$db" -f "$SETUP/schema.sql"
 
-  local f t
-  for f in "$out"/*.tbl*; do
-    t=$(basename "$f"); t=${t%%.tbl*}
-    # dbgen ends each line with '|'; strip it so COPY sees the right column count.
-    sed 's/|$//' "$f" | pg -d "$db" -c "\\copy $t FROM STDIN WITH (FORMAT text, DELIMITER '|')" &
-    while (( $(jobs -rp | wc -l) >= GEN_JOBS )); do wait -n; done
-  done
-  while (( $(jobs -rp | wc -l) > 0 )); do wait -n; done
+  local f t tables
+  if (( LOAD_JOBS == 1 )); then
+    # One table at a time; its chunks concatenated in order into one COPY. TRUNCATE in the same
+    # transaction lets COPY skip WAL (wal_level=minimal) and FREEZE the tuples.
+    tables=$(for f in "$out"/*.tbl*; do t=$(basename "$f"); echo "${t%%.tbl*}"; done | sort -u)
+    for t in $tables; do
+      log "SF$sf: loading $t"
+      # dbgen ends each line with '|'; strip it so COPY sees the right column count.
+      mapfile -t files < <(ls "$out/$t".tbl* | sort -V)
+      sed 's/|$//' "${files[@]}" | pg -d "$db" -c "BEGIN" -c "TRUNCATE $t" \
+        -c "\\copy $t FROM STDIN WITH (FORMAT text, DELIMITER '|', FREEZE)" -c "COMMIT"
+    done
+  else
+    for f in "$out"/*.tbl*; do
+      t=$(basename "$f"); t=${t%%.tbl*}
+      sed 's/|$//' "$f" | pg -d "$db" -c "\\copy $t FROM STDIN WITH (FORMAT text, DELIMITER '|')" &
+      while (( $(jobs -rp | wc -l) >= LOAD_JOBS )); do wait -n; done
+    done
+    while (( $(jobs -rp | wc -l) > 0 )); do wait -n; done
+  fi
 
   log "SF$sf: primary keys"
   pg -d "$db" -f "$SETUP/keys.sql"

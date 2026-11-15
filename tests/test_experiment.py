@@ -69,3 +69,12 @@ def test_several_queries_are_a_factor(tmp_path):
     assert path.name.endswith("_q1_t.json")
     psql = [ln for ln in sh.log if ln.startswith("[psql")]
     assert any("count(*)" in ln and "l_shipdate" in ln for ln in psql)   # m_filter's text
+
+
+def test_sf100_evicts_on_the_big_volume_and_samples_its_device(tmp_path):
+    cfg = config.load(env={"RESULTS_DIR": str(tmp_path), "DEVICE_CACHE_EVICT_GIB": "2"})
+    _, sh = run_experiment(cfg, "q6", conditions([10, 100], ["cold"], ["plain"]), blocks=1, seed=0,
+                           dry_run=True)
+    targets = [ln.split()[2] for ln in sh.log if ln.startswith("dd ") and "evict.tmp" in ln]
+    assert sorted(targets) == sorted([f"of={cfg.DATA_ROOT}/bench/evict.tmp", f"of={cfg.BIG_ROOT}/bench/evict.tmp"])
+    assert cfg.device(100) == cfg.BIG_IO_DEVICE != cfg.device(10)

@@ -91,11 +91,14 @@ def device_queue(dev: str) -> dict:
 
 def run_io_bench(cfg: Config, file_size: int = 16 * GiB, region: int = 4 * GiB,
                  runtime_s: int = 15, tests: list[IoTest] | None = None,
-                 dry_run: bool = False) -> tuple[Path, Shell]:
+                 dry_run: bool = False, volume: str = "data") -> tuple[Path, Shell]:
+    """volume: `data` (DATA_ROOT on IO_DEVICE) or `big` (BIG_ROOT on BIG_IO_DEVICE)."""
     tests = tests or default_sweep()
     sh = Shell(dry_run)
-    path = Path(cfg.DATA_ROOT) / "bench" / "fio.dat"
-    out = cfg.repo / cfg.RESULTS_DIR / "bench" / f"{datetime.now():%Y%m%d-%H%M%S}_io"
+    root, device = cfg.volume(volume)
+    path = Path(root) / "bench" / "fio.dat"
+    out = cfg.repo / cfg.RESULTS_DIR / "bench" / (f"{datetime.now():%Y%m%d-%H%M%S}_io"
+                                                  + ("" if volume == "data" else f"_{volume}"))
 
     if dry_run or not (path.exists() and path.stat().st_size == file_size):
         if not dry_run:
@@ -114,11 +117,11 @@ def run_io_bench(cfg: Config, file_size: int = 16 * GiB, region: int = 4 * GiB,
             continue
         raw = out / "raw"
         raw.mkdir(parents=True, exist_ok=True)
-        with Monitors(raw / t.name, device=cfg.IO_DEVICE, interval=1):
+        with Monitors(raw / t.name, device=device, interval=1):
             time.sleep(1)
             doc = json.loads(sh.run(cmd))
         (raw / f"{t.name}.json").write_text(json.dumps(doc, indent=1))
-        io = [r for r in parse_iostat((raw / t.name / "iostat.log").read_text(), cfg.IO_DEVICE)
+        io = [r for r in parse_iostat((raw / t.name / "iostat.log").read_text(), device)
               if r["r/s"] > 0]
         reads = sum(r["r/s"] for r in io)
         row = {"test": t.name, **asdict(t), "bs_bytes": t.bs, **parse_fio(doc),
@@ -135,7 +138,7 @@ def run_io_bench(cfg: Config, file_size: int = 16 * GiB, region: int = 4 * GiB,
             w.writerows(rows)
         (out / "meta.json").write_text(json.dumps({
             "file": str(path), "file_size": file_size, "region": region, "runtime_s": runtime_s,
-            "tests": [t.name for t in tests], "device": cfg.IO_DEVICE,
+            "tests": [t.name for t in tests], "device": device, "volume": volume,
             "queue": {d.name: device_queue(d.name) for d in sorted(Path("/sys/block").iterdir())
                       if not d.name.startswith(("loop", "sr"))},
             "sys": sysinfo.collect(),

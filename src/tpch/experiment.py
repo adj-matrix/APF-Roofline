@@ -7,7 +7,7 @@ condition (treatment) once, in a freshly shuffled order:
     ./tpch experiment --query q6 --sf 1 10 --cache cold warm --blocks 5 --label scale
 
 Terms (design of experiments): experiment > block > run; a condition is one
-(SF, cache, mode) combination. The order, the seed and every run directory go to
+(SF, cache, mode[, query][, cpufreq]) combination. The order, the seed and every run directory go to
 results/experiments/<stamp>_<query>_<label>.json, rewritten after each run, so an interrupted
 experiment still documents what ran. Each run's meta.json gets
 {"experiment", "position", "block", "prev"}; "prev" is the condition that ran just before,
@@ -21,19 +21,24 @@ import random
 from datetime import datetime
 from pathlib import Path
 
-from . import cache
+from . import cache, sysconf
 from .config import Config
 from .runner import run_query
 from .shell import Shell
 
 
 def conditions(sfs: list[int], caches: list[str], modes: list[str],
-               queries: list[str] | None = None) -> list[dict]:
-    """Cross product. With several queries (e.g. microbenchmark parts), the query is a factor too."""
+               queries: list[str] | None = None, cpufreqs: list[str] | None = None) -> list[dict]:
+    """Cross product. With several queries (e.g. microbenchmark parts), the query is a factor too;
+    with several CPU frequency settings (`governor:no_turbo`, set before each run), so is that."""
     base = [{"sf": sf, "cache": c, "mode": m} for sf, c, m in itertools.product(sfs, caches, modes)]
-    if not queries or len(queries) == 1:
-        return base
-    return [{"query": q, **c} for q in queries for c in base]
+    if queries and len(queries) > 1:
+        base = [{"query": q, **c} for q in queries for c in base]
+    if cpufreqs:
+        for f in cpufreqs:
+            sysconf.parse_cpufreq(f)
+        base = [{"cpufreq": f, **c} for f in cpufreqs for c in base]
+    return base
 
 
 def schedule(conds: list[dict], blocks: int, seed: int) -> list[dict]:
@@ -51,7 +56,8 @@ def _key(c: dict | None) -> str | None:
     if c is None:
         return None
     k = f"sf{c['sf']}_{c['mode']}_{c['cache']}"
-    return f"{c['query']}_{k}" if "query" in c else k
+    k = f"{c['query']}_{k}" if "query" in c else k
+    return f"{k}_{c['cpufreq']}" if "cpufreq" in c else k
 
 
 def run_experiment(cfg: Config, query: str, conds: list[dict], blocks: int, seed: int | None = None,
@@ -67,11 +73,19 @@ def run_experiment(cfg: Config, query: str, conds: list[dict], blocks: int, seed
            "conditions": conds, "settings": settings or {}, "order": []}
     sh = Shell(dry_run)
     if any(c["cache"] == "cold" for c in conds):
-        cache.evict_device_cache(cfg, sh)       # reads never refill it: once per experiment suffices
+        roots = sorted({cfg.root(c["sf"]) for c in conds if c["cache"] == "cold"})
+        cache.evict_device_cache(cfg, sh, roots)  # reads never refill it: once per experiment suffices
         doc["device_cache_evicted_GiB"] = cfg.int("DEVICE_CACHE_EVICT_GIB")
+        doc["device_cache_evicted_on"] = roots
+    if any("cpufreq" in c for c in conds) and "cpufreq" not in sysconf.knobs(cfg):
+        raise ValueError("--cpufreq needs the cpufreq knob in SYSCONF (it restores the setting at the end)")
     prev = None
     for pos, item in enumerate(order):
+        if "cpufreq" in item and (prev is None or prev.get("cpufreq") != item["cpufreq"]):
+            sysconf.set_cpufreq(sh, *sysconf.parse_cpufreq(item["cpufreq"]))
         extra = {"experiment": eid, "position": pos, "block": item["block"], "prev": _key(prev)}
+        if "cpufreq" in item:
+            extra["cpufreq"] = item["cpufreq"]
         runs, _ = run_query(cfg, item.get("query", query), item["sf"], item["cache"], item["mode"], label, 1,
                             settings, dry_run=dry_run, start_idx=item["block"], extra_meta=extra, sh=sh)
         doc["order"].append({**item, "position": pos, "prev": extra["prev"], "run": runs[0].name})

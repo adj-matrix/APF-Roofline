@@ -42,6 +42,8 @@ def main(argv: list[str] | None = None) -> int:
     se.add_argument("--sf", type=int, nargs="+", required=True)
     se.add_argument("--cache", choices=CACHES, nargs="+", default=list(CACHES))
     se.add_argument("--mode", choices=list(MODES), nargs="+", default=["plain"])
+    se.add_argument("--cpufreq", nargs="+", metavar="GOV:NO_TURBO",
+                    help="CPU frequency as a factor, set before each run, e.g. schedutil:0 performance:0 schedutil:1")
     se.add_argument("--blocks", type=int, default=3, help="each block runs every condition once, shuffled")
     se.add_argument("--seed", type=int, help="shuffle seed (default: random, recorded)")
     se.add_argument("--label", default="")
@@ -53,7 +55,9 @@ def main(argv: list[str] | None = None) -> int:
 
     b = sub.add_parser("bench", help="microbenchmarks")
     bsub = b.add_subparsers(dest="bench", required=True)
-    bi = bsub.add_parser("io", help="fio read sweep on a dedicated file under DATA_ROOT/bench")
+    bi = bsub.add_parser("io", help="fio read sweep on a dedicated file under <volume root>/bench")
+    bi.add_argument("--volume", choices=["data", "big"], default="data",
+                    help="data: DATA_ROOT (sda); big: BIG_ROOT (sdb, SF >= BIG_SF_MIN)")
     bi.add_argument("--file-gib", type=int, default=16)
     bi.add_argument("--runtime", type=int, default=15, help="seconds per test")
     bi.add_argument("--dry-run", action="store_true")
@@ -103,7 +107,7 @@ def _dispatch(a: argparse.Namespace) -> None:
                       f"backend CPU {sm['backend_cpu_util'] or 0:.0%}")
     elif a.cmd == "experiment":
         from .experiment import conditions, run_experiment
-        conds = conditions(a.sf, a.cache, a.mode, a.query)
+        conds = conditions(a.sf, a.cache, a.mode, a.query, a.cpufreq)
         cfg = config.load()
         path, sh = run_experiment(cfg, a.query[0], conds, a.blocks, a.seed, a.label,
                                dict(a.set), dry_run=a.dry_run)
@@ -114,6 +118,7 @@ def _dispatch(a: argparse.Namespace) -> None:
             for o in doc["order"]:
                 sm = json.loads((cfg.repo / cfg.RESULTS_DIR / "runs" / o["run"] / "summary.json").read_text())
                 print(f"{o['position']:3d} b{o['block']} {o.get('query', ''):<14s} sf{o['sf']:<3d} {o['mode']:<8s} {o['cache']:<4s} "
+                      f"{o.get('cpufreq', ''):<14s} "
                       f"wall {sm['wall_s']:7.2f}s  read {sm['dev_read_MiB']:7.0f} MiB  (prev {o['prev']})")
             print(f"experiment file: {path}")
     elif a.cmd == "summarize":
@@ -123,7 +128,7 @@ def _dispatch(a: argparse.Namespace) -> None:
     elif a.cmd == "bench" and a.bench == "io":
         from .bench.io import GiB, run_io_bench
         out, sh = run_io_bench(config.load(), file_size=a.file_gib * GiB, runtime_s=a.runtime,
-                               dry_run=a.dry_run)
+                               dry_run=a.dry_run, volume=a.volume)
         print("\n".join(sh.log) if a.dry_run else f"results in {out}")
     elif a.cmd == "bench" and a.bench == "mem":
         from .bench.mem import run_mem_bench

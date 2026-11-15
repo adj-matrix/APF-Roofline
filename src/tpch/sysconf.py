@@ -10,6 +10,8 @@ Knobs:
   timers    stop the periodic jobs in TIMERS (plocate-updatedb scans the disks every night, ...)
   pgnuma    restart PostgreSQL under `numactl` on PG_NUMA_NODE (the RAID controller's node, DDIO);
             every restart during the command (cold runs) stays bound; at the end it restarts unbound
+  cpufreq   CPU_GOVERNOR on every CPU and intel_pstate/no_turbo=CPU_NO_TURBO (the baseline; the system
+            default is schedutil with turbo). `./tpch experiment --cpufreq` also varies it per run.
 
 `applied()` writes the original state to results/sysconf/active.json BEFORE changing anything and
 deletes it after restoring. If a command is killed, that file remains: `./tpch sysconf restore`
@@ -25,12 +27,14 @@ from pathlib import Path
 from .config import Config
 from .shell import Shell, root_prefix
 
-KNOBS = ("watchdog", "timers", "pgnuma")
+KNOBS = ("watchdog", "timers", "pgnuma", "cpufreq")
 TIMERS = ("plocate-updatedb.timer", "apt-daily.timer", "apt-daily-upgrade.timer", "man-db.timer",
           "fwupd-refresh.timer", "e2scrub_all.timer", "fstrim.timer", "motd-news.timer", "logrotate.timer",
           "dpkg-db-backup.timer", "systemd-tmpfiles-clean.timer", "update-notifier-download.timer",
           "update-notifier-motd.timer")
 WATCHDOG = "/proc/sys/kernel/nmi_watchdog"
+CPUFREQ = Path("/sys/devices/system/cpu")
+NO_TURBO = "/sys/devices/system/cpu/intel_pstate/no_turbo"
 
 
 def knobs(cfg: Config) -> list[str]:
@@ -56,13 +60,23 @@ def _pg_running(cfg: Config) -> bool:
     return r.returncode == 0
 
 
+def _read(path: str | Path) -> str | None:
+    try:
+        return Path(path).read_text().strip()
+    except OSError:
+        return None
+
+
+def _governor() -> str | None:
+    """The governor of every CPU (several, comma-joined, if they differ)."""
+    govs = sorted({_read(f) for f in CPUFREQ.glob("cpu[0-9]*/cpufreq/scaling_governor")} - {None})
+    return ",".join(govs) or None
+
+
 def state(cfg: Config | None = None) -> dict:
     """The settings the knobs change (also recorded in every run's meta.json via sysinfo)."""
-    try:
-        wd = Path(WATCHDOG).read_text().strip()
-    except OSError:
-        wd = None
-    s = {"nmi_watchdog": wd, "timers_active": _active(TIMERS)}
+    s = {"nmi_watchdog": _read(WATCHDOG), "timers_active": _active(TIMERS),
+         "governor": _governor(), "no_turbo": _read(NO_TURBO)}
     if cfg is not None:
         s["pg_running"] = _pg_running(cfg)
     return s
@@ -77,6 +91,32 @@ def _restart_pg(cfg: Config, sh: Shell, bind: bool) -> None:
     pg_ctl(cfg, sh, "-m", "fast", "restart", bind=bind)
 
 
+def parse_cpufreq(text: str) -> tuple[str, str]:
+    """`performance:1` -> ("performance", "1"): governor and no_turbo (0 = turbo on)."""
+    gov, _, nt = text.partition(":")
+    if not gov or nt not in ("0", "1"):
+        raise ValueError(f"cpufreq must be GOVERNOR:NO_TURBO, e.g. schedutil:0, not {text!r}")
+    return gov, nt
+
+
+def set_cpufreq(sh: Shell, governor: str, no_turbo: str) -> None:
+    """Every CPU's governor and the turbo switch (one root shell command).
+
+    Order matters (found 2026-11-14, cpufreq experiment): writing no_turbo 1 -> 0 under an unchanged
+    `schedutil` left every CPU at <= 2.7 GHz (no turbo) although sysfs read no_turbo=0 and
+    scaling_max_freq=3.5 GHz, until the governor was restarted. So no_turbo is written first and the
+    governor is then restarted through another one, which makes it read the new limits."""
+    other = "schedutil" if governor == "performance" else "performance"
+    gov = f"{CPUFREQ}/cpu[0-9]*/cpufreq/scaling_governor"
+    sh.run([*root_prefix(), "sh", "-c",
+            f"echo {no_turbo} > {NO_TURBO}; "
+            f"for f in {gov}; do echo {other} > $f; done; for f in {gov}; do echo {governor} > $f; done"])
+
+
+def _baseline_cpufreq(cfg: Config) -> tuple[str, str]:
+    return cfg.values.get("CPU_GOVERNOR", "schedutil"), cfg.values.get("CPU_NO_TURBO", "0")
+
+
 def _apply(cfg: Config, sh: Shell, ks: list[str], orig: dict) -> None:
     if "watchdog" in ks and orig["nmi_watchdog"] not in (None, "0"):
         sh.run([*root_prefix(), "sysctl", "-q", "-w", "kernel.nmi_watchdog=0"])
@@ -84,6 +124,8 @@ def _apply(cfg: Config, sh: Shell, ks: list[str], orig: dict) -> None:
         sh.run([*root_prefix(), "systemctl", "stop", *orig["timers_active"]])
     if "pgnuma" in ks and orig.get("pg_running"):
         _restart_pg(cfg, sh, bind=True)
+    if "cpufreq" in ks:     # always: a stale governor can read right in sysfs and still lack turbo
+        set_cpufreq(sh, *_baseline_cpufreq(cfg))
 
 
 def restore(cfg: Config, sh: Shell, orig: dict, ks: list[str] | tuple[str, ...] = KNOBS) -> None:
@@ -96,6 +138,9 @@ def restore(cfg: Config, sh: Shell, orig: dict, ks: list[str] | tuple[str, ...] 
         steps.append(lambda: sh.run([*root_prefix(), "systemctl", "start", *orig["timers_active"]]))
     if "pgnuma" in ks and orig.get("pg_running") and (sh.dry_run or _pg_running(cfg)):
         steps.append(lambda: _restart_pg(cfg, sh, bind=False))
+    # Always rewritten (not only when sysfs differs): sysfs can read right while turbo is still off.
+    if "cpufreq" in ks and orig.get("governor") and "," not in orig["governor"] and orig.get("no_turbo"):
+        steps.append(lambda: set_cpufreq(sh, orig["governor"], orig["no_turbo"]))
     errors = []
     for step in steps:
         try:

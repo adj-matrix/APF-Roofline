@@ -35,6 +35,34 @@ class Config:
     def dbname(self, sf: int) -> str:
         return f"tpch_sf{sf}"
 
+    # --- volumes: SF < BIG_SF_MIN lives under DATA_ROOT (sda), larger SFs under BIG_ROOT (sdb) ---
+    def big(self, sf: int) -> bool:
+        return sf >= int(self.values.get("BIG_SF_MIN", "0") or 0) and "BIG_ROOT" in self.values
+
+    def root(self, sf: int) -> str:
+        """Root of the volume that holds this SF's tables (its bench/ dir takes the scratch files)."""
+        return self.values["BIG_ROOT"] if self.big(sf) else self.values["DATA_ROOT"]
+
+    def device(self, sf: int) -> str:
+        """Block device sampled (iostat, /proc/diskstats) while this SF is measured."""
+        return self.values["BIG_IO_DEVICE"] if self.big(sf) else self.values["IO_DEVICE"]
+
+    def volume_of(self, path: str | Path) -> tuple[str, str]:
+        """(root, device) of the volume a file lies on (symlinks such as pg_tblspc/ resolved)."""
+        real = Path(path).resolve()
+        big = self.values.get("BIG_ROOT")
+        if big and real.is_relative_to(Path(big).resolve()):
+            return big, self.values["BIG_IO_DEVICE"]
+        return self.values["DATA_ROOT"], self.values["IO_DEVICE"]
+
+    def volume(self, name: str) -> tuple[str, str]:
+        """`data` (DATA_ROOT, sda) or `big` (BIG_ROOT, sdb) -> (root, device)."""
+        if name == "big":
+            return self.values["BIG_ROOT"], self.values["BIG_IO_DEVICE"]
+        if name == "data":
+            return self.values["DATA_ROOT"], self.values["IO_DEVICE"]
+        raise ValueError(f"volume must be 'data' or 'big', not {name!r}")
+
 
 def load(path: Path = CONFIG_ENV, env: dict[str, str] | None = None) -> Config:
     """Evaluate config.env with bash so `${VAR:-default}` and overrides behave exactly as in setup.sh."""

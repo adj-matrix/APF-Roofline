@@ -115,14 +115,15 @@ def _measure(cfg: Config, sf: int, run: Path, sql: str, mode: str, cache_state: 
             (RECORDED_SETTINGS,)).fetchall())
 
         perf_events = cfg.PERF_EVENTS if cfg.int("PERF_STAT") else None
-        with Monitors(run, device=cfg.IO_DEVICE, pid=pid, interval=interval, perf_events=perf_events):
+        device = cfg.device(sf)             # sda for SF1/SF10, sdb for SF >= BIG_SF_MIN
+        with Monitors(run, device=device, pid=pid, interval=interval, perf_events=perf_events):
             time.sleep(interval)            # one idle sample before the query starts (perf attaches)
-            c0 = counters.snapshot(cfg.IO_DEVICE, pid)
+            c0 = counters.snapshot(device, pid)
             t_start = time.time()
             cur.execute(sql)
             rows = cur.fetchall()
             t_end = time.time()
-            c1 = counters.snapshot(cfg.IO_DEVICE, pid)
+            c1 = counters.snapshot(device, pid)
             time.sleep(interval + 0.2)      # let the samplers report the last interval
 
     if mode == "plain":
@@ -130,7 +131,7 @@ def _measure(cfg: Config, sf: int, run: Path, sql: str, mode: str, cache_state: 
     else:
         (run / "plan.json").write_text(json.dumps(rows[0][0], indent=2))
     meta.update(
-        t_start=t_start, t_end=t_end, counters=counters.delta(c0, c1), backend_pid=pid, device=cfg.IO_DEVICE, interval_s=interval,
+        t_start=t_start, t_end=t_end, counters=counters.delta(c0, c1), backend_pid=pid, device=device, interval_s=interval,
         settings=settings, pg_settings=pg_settings, sql=sql, config=cfg.values, sys=sysinfo.collect(),
     )
     (run / "meta.json").write_text(json.dumps(meta, indent=2))
