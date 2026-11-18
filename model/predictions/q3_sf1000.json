@@ -1,0 +1,107 @@
+{
+ "query": "q3",
+ "sf": 1000,
+ "settings": {
+  "work_mem": "64MB",
+  "hash_mem_multiplier": "2.0",
+  "enable_nestloop": "off"
+ },
+ "T": 4318.8306577555095,
+ "T_range": [
+  3926.650982148212,
+  4713.01603770673
+ ],
+ "C": 11066100930238.994,
+ "U": 7727269694849.6045,
+ "K": 3338831235389.3896,
+ "f": 3.3107195538202268,
+ "d": 0.7739377979876532,
+ "W": 976.3243686106432,
+ "parts": {
+  "U_scale_cycles": 5274180198700.0,
+  "U_spill_cycles": 2453089496149.6045,
+  "K_device_cycles": 1854232660407.1392,
+  "K_temp_cycles": 1361712937976.151,
+  "K_time_cycles": 122885637006.09961,
+  "cpu_s": 3342.5062891448665,
+  "T_io_s": 1043.2897767041309,
+  "x_ms_per_128KiB": 0.36635541649242576,
+  "W_start_s": 1.3995775097861358,
+  "W_scan_s": 40.515211024984126,
+  "W_temp_s": 808.1125436363708,
+  "W_burst_s": 126.29703643950211,
+  "temp_dev_MiB": 159497.3849983772,
+  "temp_MiB": 165044.52741715207
+ },
+ "workload": {
+  "query": "q3",
+  "sf": 1000,
+  "sf_cal": 10,
+  "settings": {
+   "work_mem": "64MB",
+   "hash_mem_multiplier": "2.0",
+   "enable_nestloop": "off"
+  },
+  "scale": 100.0,
+  "scans": [
+   {
+    "relation": "lineitem",
+    "pages": 115533166,
+    "tuples": 6000203264.0
+   },
+   {
+    "relation": "orders",
+    "pages": 26850835,
+    "tuples": 1499649536.0
+   },
+   {
+    "relation": "customer",
+    "pages": 3594735,
+    "tuples": 150006848.0
+   }
+  ],
+  "joins": [
+   {
+    "label": "hash on customer",
+    "nbatch": 16,
+    "nbuckets": 4194304,
+    "inner_rows": 30027600.0,
+    "outer_rows": 149896000.0,
+    "inner_width": 4,
+    "outer_width": 32,
+    "spilled_tuples": 168678375.0,
+    "temp_bytes": 8246609569.5005,
+    "outer_temp_bytes": 7548683099.53864,
+    "outer_scan_mib": 1112375.0078125
+   },
+   {
+    "label": "hash on orders",
+    "nbatch": 512,
+    "nbuckets": 2097152,
+    "inner_rows": 728944200.0,
+    "outer_rows": 3233425000.0,
+    "inner_width": 20,
+    "outer_width": 20,
+    "spilled_tuples": 3954630197.65625,
+    "temp_bytes": 163407655703.70367,
+    "outer_temp_bytes": 133346079699.93005,
+    "outer_scan_mib": 902602.859375
+   }
+  ],
+  "aggs": [
+   {
+    "groups": 11400300.0,
+    "input_rows": 30211400.0,
+    "entry_bytes": 400.0,
+    "spilled_tuples": 29322189.745072674,
+    "temp_bytes": 1407465107.7634883
+   }
+  ],
+  "table_pages": 145978736,
+  "table_mib": 1140458.875,
+  "spilled_tuples": 4152630762.401323,
+  "temp_bytes": 173061730380.96765
+ },
+ "params_digest": "8e421b3e3503",
+ "model_commit": "28b7214fe12dca4b55f8ae6c16c950aa1b713163"
+}

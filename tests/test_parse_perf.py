@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from tpch.monitor import Monitors, perf_stat_cmd
-from tpch.parse.perf import parse_perf_stat, perf_metrics
+from tpch.parse.perf import parse_perf_intervals, parse_perf_stat, perf_metrics
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -44,3 +44,26 @@ def test_perf_only_with_pid_and_events(tmp_path):
     assert "LC_ALL=C" in cmd
     i = cmd.index("sh")              # shell prints its PID, then exec's perf (same PID)
     assert cmd[i:i + 4] == ["sh", "-c", 'echo $$; exec "$@"', "sh"]
+
+
+INTERVALS = """\
+     1.001079297,1000.5,msec,task-clock,1000500000,100.00,1.000,CPUs utilized
+     1.001079297,3300000000,,cycles,1000500000,100.00,3.298,GHz
+     1.001079297,2400000000,,cycles:u,1000500000,100.00,,
+     2.002298167,<not counted>,msec,task-clock,0,100.00,,
+     2.002298167,<not counted>,,cycles,0,100.00,,
+     2.002298167,<not counted>,,cycles:u,0,100.00,,
+     2.443830180,400.0,msec,task-clock,400000000,100.00,0.906,CPUs utilized
+     2.443830180,1000000000,,cycles,400000000,100.00,2.500,GHz
+     2.443830180,800000000,,cycles:u,400000000,100.00,,
+"""
+
+
+def test_interval_mode_rows_and_totals():
+    rows = parse_perf_intervals(INTERVALS)
+    assert [r["t"] for r in rows] == [1.001079297, 2.002298167, 2.443830180]
+    assert rows[1]["events"]["cycles"] == (0.0, 100.0)            # off CPU for the whole interval
+    tot = parse_perf_stat(INTERVALS, interval=True)
+    assert tot["cycles"]["value"] == 4.3e9 and tot["task-clock"]["value"] == 1400.5
+    m = perf_metrics(tot)
+    assert m["perf_GHz"] == 4.3e9 / 1400.5e6 and m["perf_user_cycles_frac"] == 3.2e9 / 4.3e9

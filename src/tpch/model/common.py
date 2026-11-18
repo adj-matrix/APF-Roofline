@@ -1,3 +1,4 @@
+"""Stage-1 model helpers (SF1/SF10 reports, queries/q6/model.py). Superseded by cost.py; kept so the stage-1 figures rebuild."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

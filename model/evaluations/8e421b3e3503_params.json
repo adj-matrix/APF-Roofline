@@ -1,0 +1,263 @@
+{
+ "digest": "8e421b3e3503",
+ "params": [
+  {
+   "name": "burst_s_per_GiB",
+   "value": 1.5811764705882352,
+   "unit": "s per GiB",
+   "kind": "bench",
+   "sources": [
+    "20261115-045014_temp_spill",
+    "20261115-174445_temp_spill",
+    "20261118-003604_temp_spill"
+   ],
+   "note": "seconds with > 100 MiB/s of writeback per GiB of temp written"
+  },
+  {
+   "name": "burst_wait_per_burst_s",
+   "value": [
+    [
+     16,
+     0.39298936746907287
+    ],
+    [
+     64,
+     0.5050233553327647
+    ]
+   ],
+   "unit": "N batches -> s per burst-second",
+   "kind": "train",
+   "sources": [
+    "q3_sf100_v2_64MB",
+    "q3_sf100_v2_256MB"
+   ],
+   "note": "off-CPU time during the table scans beyond start-up and readahead waits, per second of writeback burst (burst_s_per_GiB x temp written)"
+  },
+  {
+   "name": "bw_big_MiBps",
+   "value": 1093.1372093023256,
+   "unit": "MiB/s",
+   "kind": "bench",
+   "sources": [
+    "20261114-172223_location"
+   ],
+   "note": "dd O_DIRECT 512 MiB reads over SF100 lineitem's files on sdb (hardware.md 6.1)"
+  },
+  {
+   "name": "clock_GHz_vs_on_cpu",
+   "value": [
+    [
+     0.9178975717824716,
+     3.3107195538202268
+    ],
+    [
+     1.0,
+     3.4505877392144724
+    ]
+   ],
+   "unit": "on-CPU share -> GHz",
+   "kind": "train",
+   "sources": [
+    "q3_sf100_v2_64MB",
+    "q3_sf100_v2_256MB"
+   ],
+   "note": "least squares over 6 runs (slope 1.70 GHz per unit); clamped outside [0.918, 1]; the microbenchmark (docs/7) explains the shape, not this slope"
+  },
+  {
+   "name": "kernel_cycles_per_cached_page",
+   "value": 3617.699833996174,
+   "unit": "cycles / 8 KiB page",
+   "kind": "train",
+   "sources": [
+    "q6_sf10_warm",
+    "q1_sf10_warm"
+   ],
+   "note": "pread of a page from the page cache into shared buffers"
+  },
+  {
+   "name": "kernel_cycles_per_cpu_s",
+   "value": 36764519.30851497,
+   "unit": "cycles / CPU-second",
+   "kind": "train",
+   "sources": [
+    "q6_sf10_warm",
+    "q1_sf10_warm"
+   ],
+   "note": "kernel work proportional to running time (tick, scheduler); Q1 vs Q6 warm read the same pages"
+  },
+  {
+   "name": "kernel_cycles_per_device_page",
+   "value": 12702.07368014982,
+   "unit": "cycles / 8 KiB page",
+   "kind": "bench",
+   "sources": [
+    "scan_sdb_orders_cold",
+    "scan_sdb_orders_warm",
+    "scan_sdb_lineitem_cold",
+    "q1_sf10_cold"
+   ],
+   "note": "page read from sdb (readahead, page-cache insert, copy), from a CPU-bound scan of SF100 orders (not a TPC-H query). Same scan warm: 4157; lineitem (> RAM, with reclaim): 13503; Q1 on sda at SF10: 13232. The queries imply 12.5k (Q6) - 12.8k (Q1): +-4 % depends on the code"
+  },
+  {
+   "name": "page_cache_window_MiB",
+   "value": 32364.57181689422,
+   "unit": "MiB",
+   "kind": "train",
+   "sources": [
+    "q3_sf100_v2_64MB",
+    "q3_sf100_v2_256MB"
+   ],
+   "note": "the most recent data the page cache still holds when the batches are read back; per run 34, 33, 33, 30, 30, 29 GiB, against ~56 GiB of RAM free for the cache (hypothesis: once-touched pages only get the inactive list)"
+  },
+  {
+   "name": "q1.user_cycles_cal",
+   "value": 218277340536.0,
+   "unit": "cycles at SF10",
+   "kind": "train",
+   "sources": [
+    "q1_sf10_cold"
+   ],
+   "note": "user-mode cycles of the scale model at SF10, no spill"
+  },
+  {
+   "name": "q3.kernel_cycles_per_temp_page",
+   "value": 55678.60139890054,
+   "unit": "cycles / 8 KiB page",
+   "kind": "train",
+   "sources": [
+    "q3_cal_1GB",
+    "q3_cal_128MB",
+    "q3_cal_64MB"
+   ],
+   "note": "writing a temp page into the page cache and reading it back from there"
+  },
+  {
+   "name": "q3.temp_bytes_ratio",
+   "value": 1.0330147670985066,
+   "unit": "measured / predicted",
+   "kind": "train",
+   "sources": [
+    "q3_cal_plan_1GB",
+    "q3_cal_1GB",
+    "q3_cal_128MB",
+    "q3_cal_64MB"
+   ],
+   "note": "the planner's widths vs the bytes PostgreSQL writes per spilled tuple"
+  },
+  {
+   "name": "q3.user_cycles_cal",
+   "value": 52741801987.0,
+   "unit": "cycles at SF10",
+   "kind": "train",
+   "sources": [
+    "q3_cal_1GB",
+    "q3_cal_128MB",
+    "q3_cal_64MB"
+   ],
+   "note": "user-mode cycles of the scale model at SF10, no spill"
+  },
+  {
+   "name": "q3.user_cycles_per_spilled_tuple",
+   "value": 590.73142701738,
+   "unit": "cycles",
+   "kind": "train",
+   "sources": [
+    "q3_cal_1GB",
+    "q3_cal_128MB",
+    "q3_cal_64MB"
+   ],
+   "note": "least squares over 3 work_mem settings; intercept 5.297e+10 vs no-spill 5.274e+10"
+  },
+  {
+   "name": "q6.user_cycles_cal",
+   "value": 32632505999.0,
+   "unit": "cycles at SF10",
+   "kind": "train",
+   "sources": [
+    "q6_sf10_cold"
+   ],
+   "note": "user-mode cycles of the scale model at SF10, no spill"
+  },
+  {
+   "name": "scan_wait_frac",
+   "value": [
+    [
+     0.2,
+     0.014698593098477557
+    ],
+    [
+     1.0,
+     0.007845405111860099
+    ]
+   ],
+   "unit": "ms CPU per 128 KiB -> share",
+   "kind": "bench",
+   "sources": [
+    "20261115-163808_clock_state"
+   ],
+   "note": "hardware/clock_state.py scan:X cells: time in pread calls > 0.5 ms / cell time"
+  },
+  {
+   "name": "startup_wait_s",
+   "value": 1.3995775097861358,
+   "unit": "s",
+   "kind": "train",
+   "sources": [
+    "q1_sf10_cold"
+   ],
+   "note": "off-CPU time of a CPU-bound cold scan beyond its readahead waits"
+  },
+  {
+   "name": "temp_readback_MiBps",
+   "value": [
+    [
+     4,
+     972.9966463752713
+    ],
+    [
+     16,
+     796.2473095423064
+    ],
+    [
+     32,
+     491.3184171091997
+    ],
+    [
+     64,
+     373.6579584954156
+    ],
+    [
+     128,
+     242.27528261249805
+    ],
+    [
+     256,
+     148.9168562352521
+    ],
+    [
+     512,
+     88.21514292829514
+    ]
+   ],
+   "unit": "N batches -> MiB/s",
+   "kind": "bench",
+   "sources": [
+    "20261115-045014_temp_spill",
+    "20261115-174445_temp_spill",
+    "20261118-003604_temp_spill"
+   ],
+   "note": "hardware/temp_spill.py: 8 KiB reads of N batch files written at Q3's rate"
+  },
+  {
+   "name": "temp_wait_overlap",
+   "value": 0.46688161833838193,
+   "unit": "share",
+   "kind": "train",
+   "sources": [
+    "q3_sf100_v2_64MB",
+    "q3_sf100_v2_256MB"
+   ],
+   "note": "share of the temp read-back device time the backend waits for (phase 3); per run 0.51, 0.50, 0.49, 0.39, 0.41, 0.45"
+  }
+ ]
+}

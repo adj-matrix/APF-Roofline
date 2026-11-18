@@ -116,7 +116,10 @@ def _measure(cfg: Config, sf: int, run: Path, sql: str, mode: str, cache_state: 
 
         perf_events = cfg.PERF_EVENTS if cfg.int("PERF_STAT") else None
         device = cfg.device(sf)             # sda for SF1/SF10, sdb for SF >= BIG_SF_MIN
-        with Monitors(run, device=device, pid=pid, interval=interval, perf_events=perf_events):
+        perf_interval = cfg.int("PERF_INTERVAL_MS") if "PERF_INTERVAL_MS" in cfg.values else 0
+        record_hz = cfg.int("PERF_RECORD_HZ") if "PERF_RECORD_HZ" in cfg.values and perf_events else 0
+        with Monitors(run, device=device, pid=pid, interval=interval, perf_events=perf_events,
+                      perf_interval_ms=perf_interval, perf_record_hz=record_hz) as mon:
             time.sleep(interval)            # one idle sample before the query starts (perf attaches)
             c0 = counters.snapshot(device, pid)
             t_start = time.time()
@@ -131,7 +134,10 @@ def _measure(cfg: Config, sf: int, run: Path, sql: str, mode: str, cache_state: 
     else:
         (run / "plan.json").write_text(json.dumps(rows[0][0], indent=2))
     meta.update(
-        t_start=t_start, t_end=t_end, counters=counters.delta(c0, c1), backend_pid=pid, device=device, interval_s=interval,
+        db=cfg.dbname(sf), perf_t0=mon.perf_t0, perf_interval_ms=perf_interval if mon.perf else 0,
+        perf_record_hz=record_hz,
+        t_start=t_start, t_end=t_end, counters=counters.delta(c0, c1), backend_pid=pid, device=device,
+        interval_s=interval,
         settings=settings, pg_settings=pg_settings, sql=sql, config=cfg.values, sys=sysinfo.collect(),
     )
     (run / "meta.json").write_text(json.dumps(meta, indent=2))

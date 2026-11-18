@@ -1,0 +1,125 @@
+{
+ "query": "q3",
+ "sf": 1000,
+ "settings": {
+  "work_mem": "128MB",
+  "hash_mem_multiplier": "2.0",
+  "enable_nestloop": "off"
+ },
+ "time_s": 4462.060464118467,
+ "time_range_s": [
+  4155.838648867167,
+  4770.574201500935
+ ],
+ "cycles": 12061804467445.535,
+ "user_cycles": 8712577687428.911,
+ "kernel_cycles": 3349226780016.624,
+ "clock_ghz": 3.1579635113639917,
+ "on_cpu_share": 0.8559920382756687,
+ "wait_s": 642.5722325284241,
+ "parts": {
+  "U_scale_cycles": 5310181594042.636,
+  "U_spill_cycles": 2802878503935.3276,
+  "U_write_nbatch_cycles": 252732110849.72205,
+  "U_read_batch_size_cycles": 0.0,
+  "U_false_match_cycles": 346785478601.2269,
+  "K_device_cycles": 1854232660407.1392,
+  "K_temp_cycles": 1354572470770.547,
+  "K_time_cycles": 140421648838.9375,
+  "cpu_s": 3819.488231590043,
+  "T_io_s": 1043.2897767041309,
+  "x_ms_per_128KiB": 0.2994387982860229,
+  "W_start_s": 1.3995775097861358,
+  "W_scan_s": 35.46123724413987,
+  "W_burst_s": 216.56062098319853,
+  "W_temp_s": 389.1507967912992,
+  "phase12_s": 2985.4025159341613,
+  "phase12_cpu_s": 2731.9810801970366,
+  "phase12_cycles": 9044823182875.234,
+  "phase3_cycles": 3016981284570.302,
+  "phase12_clock_GHz": 3.3107195538202268,
+  "phase3_s": 1476.657948184306,
+  "phase3_cpu_s": 1087.5071513930068,
+  "phase3_clock_GHz": 2.7742174207367722,
+  "phase3_device_s": 611.7456923030769,
+  "gamma": 0.6361316502716009,
+  "batch_file_MiB": 607.549680603875,
+  "temp_dev_MiB": 158688.76135914185,
+  "temp_MiB": 164174.55117157268
+ },
+ "workload": {
+  "query": "q3",
+  "sf": 1000,
+  "sf_cal": 10,
+  "settings": {
+   "work_mem": "128MB",
+   "hash_mem_multiplier": "2.0",
+   "enable_nestloop": "off"
+  },
+  "scale": 100.0,
+  "bigint_keys": true,
+  "scans": [
+   {
+    "relation": "lineitem",
+    "pages": 115533166,
+    "tuples": 6000203264.0
+   },
+   {
+    "relation": "orders",
+    "pages": 26850835,
+    "tuples": 1499649536.0
+   },
+   {
+    "relation": "customer",
+    "pages": 3594735,
+    "tuples": 150006848.0
+   }
+  ],
+  "joins": [
+   {
+    "label": "hash on customer",
+    "nbatch": 8,
+    "nbuckets": 8388608,
+    "inner_rows": 30027600.0,
+    "outer_rows": 149896000.0,
+    "inner_width": 4,
+    "outer_width": 32,
+    "spilled_tuples": 157433150.0,
+    "temp_bytes": 7696835598.200466,
+    "outer_temp_bytes": 7045437559.569397,
+    "outer_scan_mib": 1112375.0078125,
+    "false_hash_matches": 1047974.7153818607
+   },
+   {
+    "label": "hash on orders",
+    "nbatch": 256,
+    "nbuckets": 4194304,
+    "inner_rows": 728944200.0,
+    "outer_rows": 3233425000.0,
+    "inner_width": 20,
+    "outer_width": 20,
+    "spilled_tuples": 3946891195.3125,
+    "temp_bytes": 163087875555.55554,
+    "outer_temp_bytes": 133085128467.64056,
+    "outer_scan_mib": 902602.859375,
+    "false_hash_matches": 1442040452.3439581
+   }
+  ],
+  "aggs": [
+   {
+    "groups": 11400300.0,
+    "input_rows": 30211400.0,
+    "entry_bytes": 400.0,
+    "spilled_tuples": 28432979.490145344,
+    "temp_bytes": 1364783015.5269766
+   }
+  ],
+  "table_pages": 145978736,
+  "table_mib": 1140458.875,
+  "spilled_tuples": 4132757324.802645,
+  "temp_bytes": 172149494169.283,
+  "false_hash_matches": 1443088427.05934
+ },
+ "params_digest": "04da4632d83a",
+ "model_commit": "28b7214fe12dca4b55f8ae6c16c950aa1b713163"
+}

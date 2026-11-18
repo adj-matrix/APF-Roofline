@@ -134,6 +134,13 @@ stage_cluster() {
 }
 
 big() { (( $1 >= BIG_SF_MIN )); }
+# The largest o_orderkey is 6,000,000 x SF (sparse keys), beyond INTEGER above SF 357: the order keys
+# become BIGINT there (SF1000). All other keys fit INTEGER (largest: p_partkey = 200,000 x SF).
+# BIGKEYS=1 forces BIGINT at any SF (to test this path on a small SF).
+bigkeys() { [[ ${BIGKEYS:-0} == 1 ]] || (( $1 * 6000000 > 2147483647 )); }
+# Delete a table's .tbl files once its COPY has committed (SF1000 does not fit twice on sdb);
+# KEEP_TBL=0/1 overrides. Loaded tables are marked <tbl dir>/.loaded_<table>; a rerun resumes after them.
+keep_tbl() { (( ${KEEP_TBL:-$( (( $1 >= 1000 )) && echo 0 || echo 1)} )); }
 tbl_dir() { if big "$1"; then echo "$BIG_ROOT/tbl/sf$1"; else echo "$TBL_DIR/sf$1"; fi; }
 
 gen_sf() {  # generate $(tbl_dir N)/*.tbl*
@@ -141,7 +148,12 @@ gen_sf() {  # generate $(tbl_dir N)/*.tbl*
   [[ -x "$DBGEN_DIR/dbgen" ]] || die "dbgen not built; run the 'dbgen' stage"
   if [[ -f "$out/.done" ]]; then log "SF$sf: tbl files already generated"; return; fi
   (( sf > 1 )) || jobs=1
-  mkdir -p "$out"; rm -f "$out"/*.tbl*
+  mkdir -p "$out"
+  if big "$sf"; then   # peak: all .tbl (~1.0 x SF GiB) + the tables being loaded (~1.0 x SF GiB)
+    local free_gib; free_gib=$(( $(df -B1G --output=avail "$out" | tail -1) ))
+    (( free_gib >= 2 * sf )) || die "SF$sf needs ~$(( 2 * sf )) GiB free on $out, only $free_gib GiB"
+  fi
+  rm -f "$out"/*.tbl* "$out"/.loaded_*
   log "SF$sf: generating with $jobs job(s) into $out"
   (
     cd "$DBGEN_DIR"
@@ -162,6 +174,10 @@ load_sf() {  # load $(tbl_dir N) into database tpch_sf<N>
   if [[ "$(pg -d "$db" -Atc "SELECT value FROM tpch_meta WHERE key='loaded'" 2>/dev/null || true)" == "true" ]]; then
     log "SF$sf: database $db already loaded"; return
   fi
+  if compgen -G "$out/.loaded_*" >/dev/null \
+     && [[ "$(pg -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$db'")" == 1 ]]; then
+    log "SF$sf: resuming $db; already loaded: $(cd "$out" && echo .loaded_* | sed 's/\.loaded_//g')"
+  else
   log "SF$sf: (re)creating database $db"
   pg -d postgres -c "DROP DATABASE IF EXISTS $db"
   if big "$sf"; then
@@ -174,19 +190,32 @@ load_sf() {  # load $(tbl_dir N) into database tpch_sf<N>
   else
     pg -d postgres -c "CREATE DATABASE $db"
   fi
-  pg -d "$db" -f "$SETUP/schema.sql"
+  if bigkeys "$sf"; then
+    log "SF$sf: o_orderkey, l_orderkey as BIGINT (largest order key $(( sf * 6000000 )))"
+    sed -E 's/^(  [ol]_orderkey +)INTEGER /\1BIGINT  /' "$SETUP/schema.sql" | pg -d "$db"
+  else
+    pg -d "$db" -f "$SETUP/schema.sql"
+  fi
+  fi
 
   local f t tables
   if (( LOAD_JOBS == 1 )); then
     # One table at a time; its chunks concatenated in order into one COPY. TRUNCATE in the same
     # transaction lets COPY skip WAL (wal_level=minimal) and FREEZE the tuples.
-    tables=$(for f in "$out"/*.tbl*; do t=$(basename "$f"); echo "${t%%.tbl*}"; done | sort -u)
+    tables=$( { for f in "$out"/*.tbl* "$out"/.loaded_*; do
+                  [[ -e $f ]] || continue
+                  t=$(basename "$f"); t=${t#.loaded_}; echo "${t%%.tbl*}"
+                done; } | sort -u)
     for t in $tables; do
+      if [[ -f "$out/.loaded_$t" ]]; then log "SF$sf: $t already loaded"; continue; fi
+      compgen -G "$out/$t.tbl*" >/dev/null || die "SF$sf: no .tbl files for $t and it is not loaded"
       log "SF$sf: loading $t"
       # dbgen ends each line with '|'; strip it so COPY sees the right column count.
       mapfile -t files < <(ls "$out/$t".tbl* | sort -V)
       sed 's/|$//' "${files[@]}" | pg -d "$db" -c "BEGIN" -c "TRUNCATE $t" \
         -c "\\copy $t FROM STDIN WITH (FORMAT text, DELIMITER '|', FREEZE)" -c "COMMIT"
+      touch "$out/.loaded_$t"
+      if ! keep_tbl "$sf"; then rm -f "$out/$t".tbl*; log "SF$sf: $t loaded, its .tbl files deleted"; fi
     done
   else
     for f in "$out"/*.tbl*; do
@@ -198,11 +227,20 @@ load_sf() {  # load $(tbl_dir N) into database tpch_sf<N>
   fi
 
   log "SF$sf: primary keys"
-  pg -d "$db" -f "$SETUP/keys.sql"
+  # one statement at a time, skipping keys that exist (a resumed load may have built some)
+  local stmt kt
+  while IFS= read -r stmt; do
+    kt=$(sed -E 's/^ALTER TABLE ([a-z]+) .*/\1/' <<<"$stmt")
+    if [[ "$(pg -d "$db" -Atc "SELECT 1 FROM pg_constraint WHERE conrelid='$kt'::regclass AND contype='p'")" == 1 ]]; then
+      log "SF$sf: $kt primary key exists"; continue
+    fi
+    log "SF$sf: $kt primary key"
+    pg -d "$db" -c "$stmt"
+  done < <(grep '^ALTER TABLE' "$SETUP/keys.sql")
   # FREEZE sets hint bits / visibility map now, so the first measured scan does not write.
   log "SF$sf: VACUUM (FREEZE, ANALYZE)"
   pg -d "$db" -c "VACUUM (FREEZE, ANALYZE)"
-  pg -d "$db" -c "CREATE TABLE tpch_meta (key text PRIMARY KEY, value text);
+  pg -d "$db" -c "CREATE TABLE IF NOT EXISTS tpch_meta (key text PRIMARY KEY, value text); DELETE FROM tpch_meta;
     INSERT INTO tpch_meta VALUES ('sf', '$sf'), ('dbgen_commit', '$DBGEN_COMMIT'),
       ('loaded_at', now()::text), ('loaded', 'true');"
   log "SF$sf: loaded; size $(pg -d "$db" -Atc "SELECT pg_size_pretty(pg_database_size('$db'))")"

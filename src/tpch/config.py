@@ -33,7 +33,10 @@ class Config:
         return [int(s) for s in self.values["TPCH_SFS"].split()]
 
     def dbname(self, sf: int) -> str:
-        return f"tpch_sf{sf}"
+        """tpch_sf<N>; with TPCH_DB_VARIANT=<v> in the environment, the variant database tpch_sf<N>_<v>
+        (e.g. bigkeys: BIGINT order keys at a small SF, src/setup/variant_bigkeys.sh)."""
+        v = os.environ.get("TPCH_DB_VARIANT", "")
+        return f"tpch_sf{sf}_{v}" if v else f"tpch_sf{sf}"
 
     # --- volumes: SF < BIG_SF_MIN lives under DATA_ROOT (sda), larger SFs under BIG_ROOT (sdb) ---
     def big(self, sf: int) -> bool:

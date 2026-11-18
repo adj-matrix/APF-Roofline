@@ -1,13 +1,26 @@
 """`perf stat -x,` CSV output -> {event: {"value", "unit", "running_pct"}}.
 
 Line format: value,unit,event,run_time_ns,running_pct[,metric,metric_unit]
+With -I (interval mode) every line starts with the seconds since perf started: time,value,unit,event,...;
+the counts are per interval, and their sum is the total.
 running_pct < 100 means the counter was multiplexed and the value is scaled (less exact).
 Values "<not counted>" / "<not supported>" become None. Non-CSV lines are ignored.
 """
 from __future__ import annotations
 
 
-def parse_perf_stat(text: str) -> dict[str, dict]:
+def parse_perf_stat(text: str, interval: bool = False) -> dict[str, dict]:
+    """Totals per event (interval mode: summed over the intervals, running_pct the lowest)."""
+    if interval:
+        out = {}
+        for row in parse_perf_intervals(text):
+            for ev, (value, pct) in row["events"].items():
+                o = out.setdefault(ev, {"value": None, "unit": row["units"][ev], "running_pct": pct})
+                if value is not None:
+                    o["value"] = (o["value"] or 0.0) + value
+                if pct is not None and (o["running_pct"] is None or pct < o["running_pct"]):
+                    o["running_pct"] = pct
+        return out
     out: dict[str, dict] = {}
     for line in text.splitlines():
         f = line.split(",")
@@ -23,6 +36,33 @@ def parse_perf_stat(text: str) -> dict[str, dict]:
             pct = None
         out[f[2]] = {"value": value, "unit": f[1], "running_pct": pct}
     return out
+
+
+def parse_perf_intervals(text: str) -> list[dict]:
+    """Interval mode (-I): [{"t": seconds since perf started, "events": {event: (value, running_pct)},
+    "units": {event: unit}}], one per interval, in order. A counter that did not run in an interval
+    ("<not counted>": the process was off CPU throughout) is 0."""
+    rows: dict[float, dict] = {}
+    for line in text.splitlines():
+        f = line.strip().split(",")
+        if len(f) < 6 or not f[3] or line.startswith("#"):
+            continue
+        try:
+            t = float(f[0])
+        except ValueError:
+            continue
+        try:
+            value = float(f[1])
+        except ValueError:
+            value = 0.0 if f[1] == "<not counted>" else None
+        try:
+            pct = float(f[5])
+        except ValueError:
+            pct = None
+        r = rows.setdefault(t, {"t": t, "events": {}, "units": {}})
+        r["events"][f[3]] = (value, pct)
+        r["units"][f[3]] = f[2]
+    return [rows[t] for t in sorted(rows)]
 
 
 def perf_metrics(events: dict[str, dict]) -> dict:

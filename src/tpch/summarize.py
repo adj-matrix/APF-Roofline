@@ -8,7 +8,7 @@ import csv
 import json
 from pathlib import Path
 
-from .parse.perf import parse_perf_stat, perf_metrics
+from .parse.perf import parse_perf_intervals, parse_perf_stat, perf_metrics
 from .parse.plan import parse_plan
 from .parse.sysstat import parse_iostat, parse_mpstat, parse_pidstat
 
@@ -18,7 +18,10 @@ TIMELINE_COLUMNS = [
     "backend_cpu_pct", "backend_usr_pct", "backend_sys_pct", "backend_read_kBps",
     "dev_r_per_s", "dev_rMBps", "dev_rareq_kB", "dev_r_await_ms",
     "dev_wMBps", "dev_aqu_sz", "dev_util_pct",
+    "perf_task_ms", "perf_cycles", "perf_user_cycles", "perf_instructions",   # backend, per second (-I)
 ]
+PERF_COLUMNS = {"task-clock": "perf_task_ms", "cycles": "perf_cycles", "cycles:u": "perf_user_cycles",
+                "instructions": "perf_instructions"}
 
 
 def _read(run: Path, name: str) -> str:
@@ -53,6 +56,11 @@ def build_timeline(run: Path, meta: dict) -> list[dict]:
             dev_r_await_ms=r["r_await"], dev_wMBps=r["wkB/s"] / 1024,
             dev_aqu_sz=r["aqu-sz"], dev_util_pct=r["%util"],
         )
+    if meta.get("perf_interval_ms") and meta.get("perf_t0"):
+        # perf's interval i ends perf_t0 + t; key it on the second it ends in, like the sysstat samples
+        for r in parse_perf_intervals(_read(run, "perf.log")):
+            at(meta["perf_t0"] + r["t"]).update(
+                {col: r["events"][ev][0] for ev, col in PERF_COLUMNS.items() if ev in r["events"]})
     return [rows[k] for k in sorted(rows)]
 
 
@@ -119,7 +127,8 @@ def summarize(run: Path) -> dict:
         totals_source=source,
     )
     if (run / "perf.log").exists():   # the backend is idle outside the query: counts ~ the query
-        summary.update(perf_metrics(parse_perf_stat((run / "perf.log").read_text())))
+        summary.update(perf_metrics(parse_perf_stat((run / "perf.log").read_text(),
+                                                    interval=bool(meta.get("perf_interval_ms")))))
     if (run / "plan.json").exists():
         plan = parse_plan(json.loads((run / "plan.json").read_text()))
         root = plan["nodes"][0]

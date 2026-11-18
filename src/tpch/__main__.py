@@ -77,6 +77,22 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--out", type=Path, help="output directory (default: the cell directory)")
     rp.add_argument("--timeline", nargs="+", help="condition names drawn in the timeline figure (max 3)")
 
+    mo = sub.add_parser("model", help="the performance model: calibrate, predict, evaluate (src/tpch/model)")
+    msub = mo.add_subparsers(dest="model", required=True)
+    mc = msub.add_parser("calibrate", help="estimate every parameter from benchmarks and training runs")
+    mc.add_argument("--out", type=Path, default=Path("model/params.json"))
+    mp = msub.add_parser("predict", help="predict one condition (EXPLAIN only, nothing is executed)")
+    mp.add_argument("--query", required=True)
+    mp.add_argument("--sf", type=int, required=True)
+    mp.add_argument("--set", type=_kv, action="append", default=[], metavar="NAME=VALUE")
+    mp.add_argument("--params", type=Path, default=Path("model/params.json"))
+    mp.add_argument("--out", type=Path, help="write the prediction (JSON) here, e.g. model/predictions/<name>.json")
+    me = msub.add_parser("evaluate", help="replay the registered conditions; one row per condition")
+    me.add_argument("--params", type=Path, default=Path("model/params.json"))
+    me.add_argument("--baseline", type=Path, metavar="EVALUATION",
+                    help="an earlier version's model/evaluations/<digest>.json: compare condition by condition "
+                         "(regression check)")
+
     sub.add_parser("sysinfo", help="print the environment snapshot")
     sc = sub.add_parser("sysconf", help="system settings changed during measurements (SYSCONF in config.env)")
     sc.add_argument("action", choices=["show", "restore"],
@@ -157,6 +173,8 @@ def _dispatch(a: argparse.Namespace) -> None:
                   f"predicted [{c['prediction']['lower_s']:.1f}, {c['prediction']['upper_s']:.1f}]  "
                   f"warm {c['warm_wall_s']['median']:.2f}s")
         print(f"figures + numbers.json in {a.out}")
+    elif a.cmd == "model":
+        _model(a)
     elif a.cmd == "sysinfo":
         print(json.dumps(sysinfo.collect(), indent=2))
     elif a.cmd == "sysconf":
@@ -167,6 +185,51 @@ def _dispatch(a: argparse.Namespace) -> None:
             sh = Shell()
             doc = sysconf.restore_interrupted(cfg, sh)
             print("nothing to restore" if doc is None else "restored:\n  " + "\n  ".join(sh.log))
+
+
+def _model(a: argparse.Namespace) -> None:
+    from .model import calibrate, evaluate
+    from .model.params import ParamSet
+    cfg = config.load()
+    rel = lambda p: p if p.is_absolute() else cfg.repo / p  # noqa: E731
+    if a.model == "calibrate":
+        params = calibrate.calibrate(cfg)
+        params.save(rel(a.out))
+        for name in sorted(params):
+            value = params[name].value
+            print(f"{name:38s} {params[name].kind:6s} {value if isinstance(value, list) else f'{value:.5g}'}"
+                  f"  [{params[name].unit}]")
+        print(f"params {params.digest()} -> {rel(a.out)}")
+        return
+    params = ParamSet.load(rel(a.params))
+    if a.model == "predict":
+        import subprocess
+        pr = evaluate.predict_condition(cfg, params, a.query, a.sf, dict(a.set))
+        doc = pr.as_dict()
+        doc["model_commit"] = subprocess.run(["git", "-C", str(cfg.repo), "rev-parse", "HEAD"],
+                                             capture_output=True, text=True).stdout.strip()
+        low, high = pr.time_range_s
+        print(f"{a.query} SF{a.sf} {dict(a.set) or ''}: T = {pr.time_s:.1f} s  [{low:.0f}, {high:.0f}]"
+              f"  C = {pr.cycles / 1e9:.1f} G  f = {pr.clock_ghz:.3f} GHz  on CPU {pr.on_cpu_share:.1%}"
+              f"  W = {pr.wait_s:.1f} s")
+        for k, v in pr.parts.items():
+            print(f"  {k:18s} {v / 1e9:.2f} G" if k.endswith("cycles") else f"  {k:18s} {v:.3f}")
+        if a.out:
+            rel(a.out).parent.mkdir(parents=True, exist_ok=True)
+            rel(a.out).write_text(json.dumps(doc, indent=1, default=str) + "\n")
+            print(f"prediction -> {rel(a.out)}")
+    elif a.model == "evaluate":
+        rows = evaluate.evaluate(cfg, params)
+        print(evaluate.table(rows))
+        print(f"params {params.digest()}")
+        snap = rel(Path("model/evaluations") / f"{params.digest()}.json")
+        snap.parent.mkdir(parents=True, exist_ok=True)
+        snap.write_text(json.dumps(evaluate.snapshot(rows, params), indent=1) + "\n")
+        print(f"evaluation -> {snap}")
+        if a.baseline:
+            baseline = json.loads(rel(a.baseline).read_text())
+            print(f"\nregression check against params {baseline['params_digest']} ({a.baseline}):\n")
+            print(evaluate.compare(rows, baseline))
 
 
 if __name__ == "__main__":

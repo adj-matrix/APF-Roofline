@@ -1,0 +1,60 @@
+{
+ "query": "q6",
+ "sf": 1000,
+ "settings": {
+  "work_mem": "64MB",
+  "hash_mem_multiplier": "2.0"
+ },
+ "T": 1418.4659384036966,
+ "T_range": [
+  1370.4065543590507,
+  1467.3633297687472
+ ],
+ "C": 4782104479296.443,
+ "U": 3263250599900.0,
+ "K": 1518853879396.4434,
+ "f": 3.4242536701887785,
+ "d": 0.9845419348078776,
+ "W": 21.926738948649465,
+ "parts": {
+  "U_scale_cycles": 3263250599900.0,
+  "U_spill_cycles": 0.0,
+  "K_device_cycles": 1467510787032.9802,
+  "K_temp_cycles": 0.0,
+  "K_time_cycles": 51343092363.463135,
+  "cpu_s": 1396.539199455047,
+  "T_io_s": 825.6995111812811,
+  "x_ms_per_128KiB": 0.19340443930430118,
+  "W_start_s": 1.3995775097861358,
+  "W_scan_s": 20.527161438863327,
+  "W_temp_s": 0,
+  "W_burst_s": 0,
+  "temp_dev_MiB": 0.0,
+  "temp_MiB": 0.0
+ },
+ "workload": {
+  "query": "q6",
+  "sf": 1000,
+  "sf_cal": 10,
+  "settings": {
+   "work_mem": "64MB",
+   "hash_mem_multiplier": "2.0"
+  },
+  "scale": 100.0,
+  "scans": [
+   {
+    "relation": "lineitem",
+    "pages": 115533166,
+    "tuples": 6000203264.0
+   }
+  ],
+  "joins": [],
+  "aggs": [],
+  "table_pages": 115533166,
+  "table_mib": 902602.859375,
+  "spilled_tuples": 0,
+  "temp_bytes": 0
+ },
+ "params_digest": "0afe1e3c0f90",
+ "model_commit": "28b7214fe12dca4b55f8ae6c16c950aa1b713163"
+}
