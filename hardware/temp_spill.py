@@ -102,7 +102,29 @@ def main():
     ap.add_argument("--read-rate", type=float, default=450)
     ap.add_argument("--settle", type=float, default=5)
     ap.add_argument("--evict-mib", type=float, default=2048, help="write+delete this much before reading back")
+    ap.add_argument("--reader-only", type=float, default=0,
+                    help="S > 0: only the reader, for S seconds (no writes, no read-back): the scan's own waits")
     a = ap.parse_args()
+    if a.reader_only:
+        a.out.mkdir(parents=True, exist_ok=True)
+        s = Sampler(a.dev, a.out / f"timeline_{a.tag}.csv")
+        s.start()
+        stop, lat = threading.Event(), []
+        rt = threading.Thread(target=reader, args=(a.read_file, a.read_rate, stop, s, lat), daemon=True)
+        s.phase = "read_only"
+        rt.start()
+        time.sleep(a.reader_only)
+        stop.set()
+        rt.join()
+        s.stop.set()
+        s.join()
+        lat.sort()
+        res = {"tag": a.tag, "batches": 0, "reader_only_s": a.reader_only,
+               "reader": {"calls": len(lat), "sum_s": sum(lat), "p50_ms": lat[len(lat)//2]*1e3,
+                          "p99_ms": lat[int(len(lat)*.99)]*1e3, "max_ms": lat[-1]*1e3}}
+        (a.out / f"result_{a.tag}.json").write_text(json.dumps(res, indent=1))
+        print(json.dumps(res))
+        return
 
     a.dir.mkdir(parents=True, exist_ok=True)
     a.out.mkdir(parents=True, exist_ok=True)

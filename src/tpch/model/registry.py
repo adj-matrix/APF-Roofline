@@ -9,7 +9,7 @@ Benchmarks (no TPC-H query) are listed in BENCH; they are always allowed for cal
 Rules used to assign roles:
   * small scale factors (SF10) are training data: the model predicts large SFs from small ones;
   * at SF100, only Q3 at work_mem 64MB / 256MB of the v2 session trains the three wait / clock
-    terms that no microbenchmark covers yet (temp read-back overlap, writeback-burst wait, clock vs
+    terms that no microbenchmark covers yet (writeback-burst wait, clock vs
     on-CPU fraction); every other SF100 run is a test;
   * SF1000 is blind.
 """
@@ -86,17 +86,27 @@ DATASETS = {d.name: d for d in [
     # --- SF1000: blind (predictions in model/predictions/, written before the runs) -----------------------
     D("q6_sf1000", "blind", ("*_q6_blind",), {"sf": 1000}, "prediction: model/predictions/q6_sf1000.json"),
     D("q6_sf100_control", "test", ("*_q6_blind",), {"sf": 100}, "same-session control of q6_sf1000"),
+    D("q1_sf1000", "blind", ("*_q1_blind",), {"sf": 1000}, "prediction: model/predictions/q1_sf1000.json (params 4619dfadeec0)"),
+    D("q1_sf100_control", "test", ("*_q1_blind",), {"sf": 100}, "same-session control of q1_sf1000"),
     D("q3_sf1000", "blind", ("*_q3_blind",), {"sf": 1000},
       "work_mem 64MB, enable_nestloop off; prediction: model/predictions/q3_sf1000.json"),
     D("q3_sf100_control", "test", ("*_q3_blind",), {"sf": 100}, "same-session control of q3_sf1000"),
     D("q3_sf1000_128MB", "blind", ("*_q3_blind128",), {"sf": 1000},
       "work_mem 128MB, enable_nestloop off; prediction: model/predictions/q3_sf1000_128MB.json (params 04da4632d83a)"),
     D("q3_sf100_control_128MB", "test", ("*_q3_blind128",), {"sf": 100}, "same-session control of q3_sf1000_128MB"),
+    D("q3_sf100_32MB", "blind", ("*_q3_blind32",), {"sf": 100},
+      "work_mem 32MB (128 batches, not in training); prediction: model/predictions/q3_sf100_32MB.json (params 4619dfadeec0)"),
+    D("q3_sf1000_256MB", "blind", ("*_q3_blind256",), {"sf": 1000},
+      "work_mem 256MB, enable_nestloop off; prediction: model/predictions/q3_sf1000_256MB.json (params 4619dfadeec0)"),
+    D("q3_sf100_control_256MB", "test", ("*_q3_blind256",), {"sf": 100}, "same-session control of q3_sf1000_256MB"),
 ]}
 
 BENCH = {
     "temp_spill": ("20261115-045014_temp_spill", "20261115-174445_temp_spill", "20261118-003604_temp_spill",
                    "20261118-134033_temp_spill"),   # the last: N = 512 at x1 / x3 / x10 the volume (file size)
+    "readback_cpu": ("20261119-003449_readback_cpu",),
+    "burst_m5": ("20261119-200836_burst_m5",),   # M5: the scan reader alone (baseline of burst_wait_per_burst_s)   # M4: read-back with CPU between reads, 4 layouts
+    "layout_rate": ("20261119-020436_layout_rate",),     # extents of 64 files written at 0.1 / 0.2 MiB/s
     "clock_state": ("20261115-163808_clock_state",),
     "location_big": ("20261114-172223_location",),
 }
@@ -134,8 +144,13 @@ TESTS = [
     # new parameter set, never used for calibration
     ("q6_sf1000", None, {}),
     ("q6_sf100_control", "q6_sf100_plan", {}),
+    ("q1_sf1000", None, {}),
+    ("q1_sf100_control", "q1_sf100_plan", {}),
     ("q3_sf1000", None, {"work_mem": "64MB", "enable_nestloop": "off"}),
     ("q3_sf100_control", "q3_sf100_plan_64MB", {"work_mem": "64MB", "enable_nestloop": "off"}),
     ("q3_sf1000_128MB", None, {"work_mem": "128MB", "enable_nestloop": "off"}),
     ("q3_sf100_control_128MB", "q3_sf100_plan_128MB", {"work_mem": "128MB", "enable_nestloop": "off"}),
+    ("q3_sf100_32MB", None, {"work_mem": "32MB"}),
+    ("q3_sf1000_256MB", None, {"work_mem": "256MB", "enable_nestloop": "off"}),
+    ("q3_sf100_control_256MB", "q3_sf100_v2_plan_256MB", {"work_mem": "256MB", "enable_nestloop": "off"}),
 ]

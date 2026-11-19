@@ -4,8 +4,10 @@
 One worker process, bound to NUMA node 0 like PostgreSQL (numactl), runs one of these loads for DUR s:
   spin                busy loop (a warm, CPU-bound query)
   LOAD@pin            any load with the worker pinned to CPU 6 instead of all of node 0
-  sleep:D             busy loop with a 0.3 ms sleep inserted so that the on-CPU fraction is D (a query
-                      that waits briefly and often, like Q3's temp-file reads), no I/O
+  sleep:D[:L]         busy loop with an L ms sleep (default 0.3) inserted so that the on-CPU fraction is D
+                      (a query that waits briefly and often, like Q3's temp-file reads), no I/O
+  dread:D             busy loop with a synchronous random 128 KiB O_DIRECT read of READ_FILE as the idle
+                      (a device wait instead of a timer: does the kind of idle matter, or only its length?)
   scan:X[:W]          sequential buffered 128 KiB preads of READ_FILE (our own file on sdb, read-only),
                       with X ms of busy work per 128 KiB (Q6 ≈ 0.2 ms, Q1 ≈ 1.0 ms of CPU per 128 KiB);
                       pages behind are dropped (posix_fadvise DONTNEED) so the page cache stays empty;
@@ -37,11 +39,32 @@ def worker(load, dur, read_file, out):
     if load == "spin" or load.startswith("spin+wakers"):
         spin_until(t_end)
     elif load.startswith("sleep:"):
-        d, s = float(load.split(":")[1]), 0.0003
+        parts = load.split(":")
+        d = float(parts[1])
+        s = float(parts[2]) / 1000 if len(parts) > 2 else 0.0003
         w = s * d / (1 - d)
+        idle_n, idle_s = 0, 0.0
         while time.perf_counter() < t_end:
             spin_until(time.perf_counter() + w)
+            a = time.perf_counter()
             time.sleep(s)
+            idle_n, idle_s = idle_n + 1, idle_s + time.perf_counter() - a
+        st.update(idle_n=idle_n, idle_ms_mean=idle_s / max(idle_n, 1) * 1000)
+    elif load.startswith("dread:"):                 # idle = a synchronous device read (O_DIRECT, random 128 KiB)
+        import mmap
+        d = float(load.split(":")[1])
+        fd = os.open(read_file, os.O_RDONLY | os.O_DIRECT)
+        nchunks = os.fstat(fd).st_size // CHUNK
+        buf, rng = mmap.mmap(-1, CHUNK), random.Random(os.getpid())
+        idle_n, idle_s = 0, 0.0
+        while time.perf_counter() < t_end:
+            a = time.perf_counter()
+            os.preadv(fd, [buf], rng.randrange(nchunks) * CHUNK)
+            idle_n, idle_s = idle_n + 1, idle_s + time.perf_counter() - a
+            mean = idle_s / idle_n                   # busy work sized to the running mean read time -> on-CPU d
+            spin_until(time.perf_counter() + mean * d / (1 - d))
+        os.close(fd)
+        st.update(idle_n=idle_n, idle_ms_mean=idle_s / max(idle_n, 1) * 1000)
     elif load.startswith("mem:"):                   # memory-bound, no I/O, no sleep (energy-efficient turbo?)
         import numpy as np
         rng = np.random.default_rng(1)
@@ -197,7 +220,7 @@ def main():
             f.write(json.dumps(res) + "\n")
             f.flush()
             print(tag, f"GHz {res['GHz']:.3f} on_cpu {res['on_cpu']:.4f}",
-                  {k: round(v, 2) for k, v in res.items() if k in ("MiB", "slow_calls", "slow_s", "cs_per_s", "migrations_per_s", "IPC", "llc_miss_per_kinstr")}, flush=True)
+                  {k: round(v, 2) for k, v in res.items() if k in ("idle_ms_mean", "MiB", "slow_calls", "slow_s", "cs_per_s", "migrations_per_s", "IPC", "llc_miss_per_kinstr")}, flush=True)
             time.sleep(3)
     print("system settings (applied, then restored):\n  " + "\n  ".join(sh.log))
 

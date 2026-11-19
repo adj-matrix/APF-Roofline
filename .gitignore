@@ -3,6 +3,7 @@
 /.vscode
 /results
 /**/*.md
+.nfs*
 
 ### Python
 

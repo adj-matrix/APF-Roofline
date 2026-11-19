@@ -1,0 +1,84 @@
+{
+ "query": "q1",
+ "sf": 1000,
+ "settings": {
+  "work_mem": "64MB",
+  "hash_mem_multiplier": "2.0"
+ },
+ "time_s": 6908.540140953279,
+ "time_range_s": [
+  6688.0140765625765,
+  7133.177729326433
+ ],
+ "cycles": 23547149985666.273,
+ "user_cycles": 21827734053600.0,
+ "kernel_cycles": 1719415932066.2734,
+ "clock_ghz": 3.4366096420702537,
+ "on_cpu_share": 0.9917948766249736,
+ "wait_s": 56.68542419784444,
+ "parts": {
+  "U_scale_cycles": 21827734053600.0,
+  "U_spill_cycles": 0.0,
+  "U_write_nbatch_cycles": 0.0,
+  "U_read_batch_size_cycles": 0.0,
+  "U_false_match_cycles": 0.0,
+  "K_device_cycles": 1467510787032.9802,
+  "K_temp_cycles": 0.0,
+  "K_time_cycles": 251905145033.29297,
+  "cpu_s": 6851.854716755434,
+  "T_io_s": 825.6995111812811,
+  "x_ms_per_128KiB": 0.9489022006727225,
+  "W_start_s": 1.3995775097861358,
+  "W_scan_s": 55.28584668805847,
+  "W_burst_s": 0,
+  "W_temp_s": 0.0,
+  "phase12_s": 6908.540140953279,
+  "phase12_cpu_s": 6851.854716755434,
+  "phase12_cycles": 23547149985666.273,
+  "phase3_cycles": 0.0,
+  "phase12_clock_GHz": 3.4366096420702537,
+  "phase3_s": 0.0,
+  "phase3_cpu_s": 0.0,
+  "phase3_clock_GHz": 0.0,
+  "phase3_stream_s": 0.0,
+  "phase3_extents": 0.0,
+  "W_jump_s": 0.0,
+  "temp_dev_MiB": 0.0,
+  "temp_MiB": 0.0
+ },
+ "workload": {
+  "query": "q1",
+  "sf": 1000,
+  "sf_cal": 10,
+  "settings": {
+   "work_mem": "64MB",
+   "hash_mem_multiplier": "2.0"
+  },
+  "scale": 100.0,
+  "bigint_keys": true,
+  "scans": [
+   {
+    "relation": "lineitem",
+    "pages": 115533166,
+    "tuples": 6000203264.0
+   }
+  ],
+  "joins": [],
+  "aggs": [
+   {
+    "groups": 400.0,
+    "input_rows": 5914260900.0,
+    "entry_bytes": 400.0,
+    "spilled_tuples": 0.0,
+    "temp_bytes": 0.0
+   }
+  ],
+  "table_pages": 115533166,
+  "table_mib": 902602.859375,
+  "spilled_tuples": 0.0,
+  "temp_bytes": 0.0,
+  "false_hash_matches": 0
+ },
+ "params_digest": "4619dfadeec0",
+ "model_commit": "c0445d8cbef79ae27723a60f468549890a67d9fa"
+}

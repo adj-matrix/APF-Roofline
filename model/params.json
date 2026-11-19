@@ -1,5 +1,5 @@
 {
- "digest": "04da4632d83a",
+ "digest": "8402a6f5657e",
  "params": [
   {
    "name": "burst_s_per_GiB",
@@ -18,32 +18,44 @@
    "name": "burst_wait_per_burst_s",
    "value": [
     [
+     4,
+     0.34886848730500786
+    ],
+    [
      16,
-     0.3301110686740212
+     0.34886848730500786
+    ],
+    [
+     32,
+     0.34886848730500786
     ],
     [
      64,
-     0.42003148826696535
+     0.48166131155565384
+    ],
+    [
+     128,
+     0.6622716562263667
     ],
     [
      256,
-     0.741875235570465
+     0.7969271185062826
     ],
     [
      512,
-     0.9443501331111444
+     0.8361335607431829
     ]
    ],
    "unit": "N batches -> s per burst-second",
-   "kind": "train",
+   "kind": "bench",
    "sources": [
-    "q3_sf100_v2_64MB",
-    "q3_sf100_v2_256MB",
-    "q3_sf100_rb_8MB",
-    "q3_sf100_rb_16MB",
-    "q3_sf100_rb_64MB"
+    "20261115-045014_temp_spill",
+    "20261115-174445_temp_spill",
+    "20261118-003604_temp_spill",
+    "20261118-134033_temp_spill",
+    "20261119-200836_burst_m5"
    ],
-   "note": "off-CPU time during the table scans beyond start-up and readahead waits, per second of writeback burst (burst_s_per_GiB x temp written)"
+   "note": "reader alone 58.7 s over 121 s; per N (raw, before pooling) 4: 0.41, 16: 0.39, 32: 0.21, 64: 0.48, 128: 0.66, 256: 0.80, 512: 0.84. The query fit it replaces (Q3 SF100, 2026-11-18): 16: 0.33, 64: 0.42, 256: 0.74, 512: 0.94"
   },
   {
    "name": "bw_big_MiBps",
@@ -134,6 +146,14 @@
     "q1_sf10_cold"
    ],
    "note": "page read from sdb (readahead, page-cache insert, copy), from a CPU-bound scan of SF100 orders (not a TPC-H query). Same scan warm: 4157; lineitem (> RAM, with reclaim): 13503; Q1 on sda at SF10: 13232. The queries imply 12.5k (Q6) - 12.8k (Q1): +-4 % depends on the code"
+  },
+  {
+   "name": "mballoc_window_MiB",
+   "value": 8.0,
+   "unit": "MiB",
+   "kind": "system",
+   "sources": [],
+   "note": "ext4 mballoc ext4_mb_normalize_request: a request below 8 MiB is rounded up to an aligned 1/2/4/8 MiB window by file size; the rest stays preallocated for the file"
   },
   {
    "name": "page_cache_window_MiB",
@@ -246,61 +266,6 @@
    "note": "user-mode cycles of the scale model at SF10, no spill"
   },
   {
-   "name": "readback_batch_overhead_s",
-   "value": 0.07585185860517024,
-   "unit": "s per batch",
-   "kind": "bench",
-   "sources": [
-    "20261115-045014_temp_spill",
-    "20261115-174445_temp_spill",
-    "20261118-003604_temp_spill",
-    "20261118-134033_temp_spill"
-   ],
-   "note": "hardware/temp_spill.py, N = 512 at three file sizes: 13 MiB/batch 90 MiB/s, 40 MiB/batch 134 MiB/s, 133 MiB/batch 165 MiB/s"
-  },
-  {
-   "name": "readback_bw_MiBps",
-   "value": [
-    [
-     4,
-     1017.1553097470281
-    ],
-    [
-     16,
-     928.1463852728001
-    ],
-    [
-     32,
-     595.8090711158319
-    ],
-    [
-     64,
-     509.5945172499251
-    ],
-    [
-     128,
-     370.4065177527495
-    ],
-    [
-     256,
-     259.09708319307526
-    ],
-    [
-     512,
-     181.77677495411191
-    ]
-   ],
-   "unit": "N batches -> MiB/s",
-   "kind": "bench",
-   "sources": [
-    "20261115-045014_temp_spill",
-    "20261115-174445_temp_spill",
-    "20261118-003604_temp_spill",
-    "20261118-134033_temp_spill"
-   ],
-   "note": "transfer rate of a batch's files after the per-batch overhead (8 KiB reads, files written at Q3's rate)"
-  },
-  {
    "name": "readback_cycles_share",
    "value": 0.23243243986888365,
    "unit": "share of the base cycles",
@@ -313,29 +278,14 @@
    "note": "phase-3 cycles / cycles, both without the batch-count and batch-size terms and without the kernel cycles per CPU-second; per run 0.232, 0.231, 0.233, 0.233, 0.232, 0.231, 0.234, 0.233, 0.229"
   },
   {
-   "name": "readback_overlap_gamma",
-   "value": [
-    [
-     27.39334295193354,
-     0.8218239784634256
-    ],
-    [
-     54.67947125434875,
-     0.859985018408303
-    ],
-    [
-     216.14473342895505,
-     0.6361316502716009
-    ]
-   ],
-   "unit": "MiB per batch (inner + outer file) -> share",
-   "kind": "train",
+   "name": "readback_wait_per_extent_s",
+   "value": 0.024575340010061376,
+   "unit": "s per extent",
+   "kind": "bench",
    "sources": [
-    "q3_sf100_rb_8MB",
-    "q3_sf100_rb_16MB",
-    "q3_sf100_rb_64MB"
+    "20261119-003449_readback_cpu"
    ],
-   "note": "phase-3 time = max(D, cpu) + gamma x min(D, cpu), the form of a buffered scan; indexed by the size of a batch's files, not N (at SF100 both are set by work_mem; chosen after the Q3 x SF1000 blind test, where N = 512 but files as SF100 / 64MB's: to be checked by a new blind test); clamped. Per run 27 MiB: 0.87, 0.82, 0.73; 55 MiB: 0.81, 0.86, 0.86; 216 MiB: 0.64, 0.64, 0.60"
+   "note": "off-CPU time of the read-back / discontinuities in read order, ms: n16_x1 (95): 25.0, 25.5; n512_x1 (2560): 24.0, 25.3; n512_x3 (4073): 24.2, 25.1; n64_x1 (372): 22.0, 23.3. Q3 x SF100 temp files (queries/q3/sf1000/layout_tempfiles.sh, not used): 19-26 ms"
   },
   {
    "name": "scan_wait_frac",
@@ -407,6 +357,29 @@
    "note": "phases 1-2 user cycles above 64MB's, per spilled tuple; clamped (N < 64: 0). 8MB: N=512, S=2.2 MiB, U12 620 G, U3 179 G, spilled 415 M; 16MB: N=256, S=4.3 MiB, U12 590 G, U3 193 G, spilled 413 M; 64MB: N=64, S=17.4 MiB, U12 565 G, U3 209 G, spilled 401 M"
   },
   {
+   "name": "start_extents_vs_chunk_MiB",
+   "value": [
+    [
+     3.0,
+     3.453125
+    ],
+    [
+     6.0,
+     1.46875
+    ],
+    [
+     8.0,
+     1.0
+    ]
+   ],
+   "unit": "MiB per writeback -> extents",
+   "kind": "bench",
+   "sources": [
+    "20261119-020436_layout_rate"
+   ],
+   "note": "extents of a file's first window: extents per file - (size - window) / window, 64 files of 40 MiB at 0.1 / 0.2 MiB/s; the point at the window by continuity"
+  },
+  {
    "name": "startup_wait_s",
    "value": 1.3995775097861358,
    "unit": "s",
@@ -430,6 +403,14 @@
     "q3_calt_twin_1GB"
    ],
    "note": "storing, deforming and comparing an inner tuple whose hash equals the probe's; 64MB: 9.0 M matches, 314; 128MB: 9.0 M matches, 237; 1GB: 9.0 M matches, 240"
+  },
+  {
+   "name": "writeback_expire_s",
+   "value": 30.0,
+   "unit": "s",
+   "kind": "system",
+   "sources": [],
+   "note": "vm.dirty_expire_centisecs: dirty data older than this is written back (checked every 5 s)"
   }
  ]
 }

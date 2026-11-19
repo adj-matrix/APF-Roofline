@@ -4,6 +4,7 @@ Every number the cost model uses is a Param. `kind` says how much it can be trus
   bench       measured by a microbenchmark that runs no TPC-H query (hardware/, ./tpch bench)
   train       estimated from TPC-H runs registered as training data (registry.py), at small SF or,
               where marked, SF100 runs that are excluded from every test
+  system      a setting or constant of the machine's software (sysctl, kernel source), read, not fitted
   assumption  set by reasoning, not measured; listed so that it can be challenged
 `sources` names the runs / benchmark directories it came from.
 """
@@ -14,7 +15,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-KINDS = ("bench", "train", "assumption")
+KINDS = ("bench", "train", "system", "assumption")
 
 
 @dataclass
@@ -25,7 +26,7 @@ class Param:
         name: e.g. "kernel_cycles_per_device_page"; per-query parameters are prefixed "q3." etc.
         value: a number, or a curve [[x, y], ...] read with `interp`.
         unit: unit of the value (of y, for a curve, with "x -> y" naming both).
-        kind: "bench", "train" or "assumption" (see the module docstring).
+        kind: "bench", "train", "system" or "assumption" (see the module docstring).
         sources: datasets (registry.py) or benchmark directories it was estimated from.
         note: how it was estimated, and anything a reader should check.
     """

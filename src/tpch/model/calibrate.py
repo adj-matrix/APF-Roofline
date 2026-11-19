@@ -34,12 +34,27 @@ def _least_squares(xs, ys) -> tuple[float, float]:
     return mean_y - slope * mean_x, slope
 
 
+def _pool_non_decreasing(points):
+    """Pool adjacent violators: [(x, y, weight)] -> [(x, y)] with y non-decreasing in x (weighted means)."""
+    blocks = [[[x], y, w] for x, y, w in points]
+    i = 0
+    while i < len(blocks) - 1:
+        if blocks[i][1] > blocks[i + 1][1]:
+            a, b = blocks[i], blocks[i + 1]
+            blocks[i] = [a[0] + b[0], (a[1] * a[2] + b[1] * b[2]) / (a[2] + b[2]), a[2] + b[2]]
+            del blocks[i + 1]
+            i = max(i - 1, 0)
+        else:
+            i += 1
+    return [(x, y) for xs, y, _ in blocks for x in xs]
+
+
 def bench_params(cfg: Config, params: ParamSet) -> None:
     """Parameters measured by microbenchmarks that run no TPC-H query.
 
-    Adds bw_big_MiBps, readback_batch_overhead_s and readback_bw_MiBps (curve over the number of batch
-    files), burst_s_per_GiB and
-    scan_wait_frac (curve over CPU time per 128 KiB).
+    Adds bw_big_MiBps, burst_s_per_GiB, scan_wait_frac (curve over CPU time per 128 KiB), and the
+    read-back's extent model: readback_wait_per_extent_s, start_extents_vs_chunk_MiB, plus two constants of
+    the system (writeback_expire_s from sysctl, mballoc_window_MiB from the ext4 source).
     """
     # sequential read bandwidth of the big volume where the SF100+ tables live
     location_dirs = data.bench_dirs(cfg, "location_big")
@@ -50,36 +65,81 @@ def bench_params(cfg: Config, params: ParamSet) -> None:
     params.add(Param("bw_big_MiBps", st.mean(rates), "MiB/s", "bench", [d.name for d in location_dirs],
                      "dd O_DIRECT 512 MiB reads over SF100 lineitem's files on sdb (hardware.md 6.1)"))
 
-    # temp-file read-back: a fixed time per batch plus transfer at a bandwidth that falls with the number
-    # of files N (written concurrently, their extents interleave). Time per batch = overhead + s / bw(N),
-    # s = MiB per batch (inner + outer file). The overhead comes from N = 512 at three file sizes (least
-    # squares of time per batch on s); bw(N) from each N's rate given that overhead.
-    rates, bursts_per_gib = {}, []          # (N, MiB per batch) -> rates
+    # writeback bursts while batch files are written (hardware/temp_spill.py)
+    bursts_per_gib = []
     spill_dirs = data.bench_dirs(cfg, "temp_spill")
     for d in spill_dirs:
         for f in sorted(d.glob("result_*.json")):
             result = json.loads(f.read_text())
-            per_batch = (result["inner_MiB"] + result["outer_MiB"]) / result["batches"]
-            rates.setdefault((result["batches"], per_batch), []).append(result["read_MiBps"])
             with open(d / f"timeline_{result['tag']}.csv") as t:
                 writing = [x for x in csv.DictReader(t) if x["phase"] in ("write", "settle")]
             gib = (result["inner_MiB"] + result["outer_MiB"]) / 1024
             bursts_per_gib.append(sum(1 for x in writing if float(x["wMiBps"]) > 100) / gib)
-    sources = [d.name for d in spill_dirs]
-    sizes = sorted((s, _median(v)) for (n, s), v in rates.items() if n == 512)
-    overhead, s_per_mib = _least_squares([s for s, _ in sizes], [s / r for s, r in sizes])
-    bandwidth = {}
-    for (n, s), v in rates.items():
-        bandwidth.setdefault(n, []).append(s / (s / _median(v) - overhead))
-    params.add(Param("readback_batch_overhead_s", overhead, "s per batch", "bench", sources,
-                     "hardware/temp_spill.py, N = 512 at three file sizes: "
-                     + ", ".join(f"{s:.0f} MiB/batch {r:.0f} MiB/s" for s, r in sizes)))
-    params.add(Param("readback_bw_MiBps", [[n, _median(v)] for n, v in sorted(bandwidth.items())],
-                     "N batches -> MiB/s", "bench", sources,
-                     "transfer rate of a batch's files after the per-batch overhead (8 KiB reads, files "
-                     "written at Q3's rate)"))
-    params.add(Param("burst_s_per_GiB", _median(bursts_per_gib), "s per GiB", "bench", sources,
+    params.add(Param("burst_s_per_GiB", _median(bursts_per_gib), "s per GiB", "bench", [d.name for d in spill_dirs],
                      "seconds with > 100 MiB/s of writeback per GiB of temp written"))
+
+    # the table scan's extra wait during those bursts (M5): temp_spill.py runs a 450 MiB/s reader (the scan)
+    # while N batch files are written; hardware/burst_m5.sh adds the reader alone. Extra read-call time per
+    # second of burst = (reader time at N - reader alone) / (burst_s_per_GiB x GiB written), over the x1
+    # cells (6.64 GiB at 56 MiB/s, Q3 x SF100's rate); medians per N, made non-decreasing in N (pooling).
+    m5_dirs = data.bench_dirs(cfg, "burst_m5")
+    alone, at_n = [], {}
+    for d in spill_dirs + m5_dirs:
+        for f in sorted(d.glob("result_*.json")):
+            result = json.loads(f.read_text())
+            if "reader" not in result:
+                continue
+            if result.get("reader_only_s"):
+                alone.append(result["reader"]["sum_s"])
+            elif result["inner_MiB"] + result["outer_MiB"] == 6800:
+                at_n.setdefault(result["batches"], []).append(result["reader"]["sum_s"])
+    burst_s = params.value("burst_s_per_GiB") * 6800 / 1024
+    base = _median(alone)
+    raw = [(n, (_median(v) - base) / burst_s, len(v)) for n, v in sorted(at_n.items())]
+    params.add(Param("burst_wait_per_burst_s", [[n, w] for n, w in _pool_non_decreasing(raw)],
+                     "N batches -> s per burst-second", "bench", [d.name for d in spill_dirs + m5_dirs],
+                     f"reader alone {base:.1f} s over 121 s; per N (raw, before pooling) "
+                     + ", ".join(f"{n}: {w:.2f}" for n, w, _ in raw)
+                     + ". The query fit it replaces (Q3 SF100, 2026-11-18): 16: 0.33, 64: 0.42, 256: 0.74, 512: 0.94"))
+
+    # read-back of batch files: off-CPU time per extent jump (hardware/readback_cpu.py). The off-CPU time is
+    # a set of 5-6 ms waits, ~4.4 per discontinuity, and barely depends on the CPU time between reads (-15 %
+    # from 0.3 to 1.5 ms per request); the passes at 40-60 us per 8 KiB block are Q3's phase-3 range.
+    readback_dirs = data.bench_dirs(cfg, "readback_cpu")
+    per_extent, detail = [], []
+    for d in readback_dirs:
+        for f in sorted(d.glob("result_*.json")):
+            result = json.loads(f.read_text())
+            jumps = result["layout"]["discontinuities"]
+            values = [p["off_cpu_s"] / jumps for p in result["passes"] if 40 <= p["cpu_us_per_block"] <= 60]
+            per_extent += values
+            detail.append(f"{result['tag']} ({jumps}): " + ", ".join(f"{v * 1e3:.1f}" for v in values))
+    params.add(Param("readback_wait_per_extent_s", _median(per_extent), "s per extent", "bench",
+                     [d.name for d in readback_dirs],
+                     "off-CPU time of the read-back / discontinuities in read order, ms: " + "; ".join(detail)
+                     + ". Q3 x SF100 temp files (queries/q3/sf1000/layout_tempfiles.sh, not used): 19-26 ms"))
+
+    # extents of slowly written files: the first window's extents vs MiB per writeback (hardware/layout_rate.sh)
+    window = 8.0
+    params.add(Param("mballoc_window_MiB", window, "MiB", "system", [],
+                     "ext4 mballoc ext4_mb_normalize_request: a request below 8 MiB is rounded up to an aligned "
+                     "1/2/4/8 MiB window by file size; the rest stays preallocated for the file"))
+    with open("/proc/sys/vm/dirty_expire_centisecs") as f:
+        expiry = int(f.read()) / 100
+    params.add(Param("writeback_expire_s", expiry, "s", "system", [],
+                     "vm.dirty_expire_centisecs: dirty data older than this is written back (checked every 5 s)"))
+    layout_dirs = data.bench_dirs(cfg, "layout_rate")
+    start = [[window, 1.0]]                  # chunk = window: one extent per window, continuous with size / chunk
+    for d in layout_dirs:
+        for f in sorted(d.glob("result_*.json")):
+            result = json.loads(f.read_text())
+            files, size = result["batches"], result["outer_MiB"] / result["batches"]
+            chunk = result["rate"] / files * expiry
+            start.append([chunk, result["layout"]["extents"] / files - (size - window) / window])
+    params.add(Param("start_extents_vs_chunk_MiB", sorted(start), "MiB per writeback -> extents", "bench",
+                     [d.name for d in layout_dirs],
+                     "extents of a file's first window: extents per file - (size - window) / window, 64 files of "
+                     "40 MiB at 0.1 / 0.2 MiB/s; the point at the window by continuity"))
 
     # share of a CPU-bound buffered scan spent waiting for readahead, vs CPU time per 128 KiB
     clock_dirs = data.bench_dirs(cfg, "clock_state")
@@ -256,17 +316,15 @@ def readback_params(cfg: Config, params: ParamSet) -> None:
     so SF1000 / 64MB (N = 512, but S as SF100 / 64MB) takes each from the setting that shares it.
 
     Also adds readback_cycles_share (phase 3's share of the remaining base cycles, without either term and
-    without the kernel cycles per CPU-second: one number), clock_readback_GHz_vs_on_cpu (curve: phase-3
-    clock vs phase-3 on-CPU share) and readback_overlap_gamma (curve over N: phase-3 time =
-    max(D, cpu3) + gamma x min(D, cpu3), D = device read in phase 3 / read-back rate).
+    without the kernel cycles per CPU-second: one number) and clock_readback_GHz_vs_on_cpu (curve: phase-3
+    clock vs phase-3 on-CPU share).
     """
-    from .cost import readback_rate_mibps
     from .evaluate import workload_for
     conditions = {512: "8MB", 256: "16MB", 64: "64MB"}
     reference = "64MB"
     sources = [f"q3_sf100_rb_{wm}" for wm in conditions.values()]
     per_second_k = params.value("kernel_cycles_per_cpu_s")
-    measured, clock_points, gammas = {}, [], {}
+    measured, clock_points = {}, []
     for nbatch, work_mem in conditions.items():
         work = workload_for(cfg, params, "q3", 100, {"work_mem": work_mem},
                             from_explain(workload.explain(cfg, "q3", 100, {"work_mem": work_mem})))
@@ -285,9 +343,6 @@ def readback_params(cfg: Config, params: ParamSet) -> None:
                          "cpu12": cpu12, "cpu3": cpu3})
             cycles3 = total("perf_cycles", p3)
             run_clocks.append((cpu3 / len(p3), cycles3 / cpu3 / 1e9))
-            device_s = run.phases["p3_dev_read_MiB"] / readback_rate_mibps(params, biggest)
-            batch_file_mib = biggest.temp_bytes / biggest.nbatch / 2**20
-            gammas.setdefault(batch_file_mib, []).append((len(p3) - max(device_s, cpu3)) / min(device_s, cpu3))
         measured[work_mem] = {"nbatch": nbatch, "batch_mib": biggest.batch_inner_mib,
                               "spilled": work.spilled_tuples, "runs": runs,
                               **{k: _median(r[k] for r in runs) for k in ("U12", "U3")}}
@@ -320,29 +375,19 @@ def readback_params(cfg: Config, params: ParamSet) -> None:
                      "phase-3 on-CPU share -> GHz", "train", sources,
                      "medians per work_mem; clamped outside. Steeper than the scan phase: synchronous waits every "
                      "1-2 ms. Q3 x SF1000 (blind, not used): 0.66 -> 2.54 (turbostat)"))
-    params.add(Param("readback_overlap_gamma", [[m, _median(v)] for m, v in sorted(gammas.items())],
-                     "MiB per batch (inner + outer file) -> share", "train", sources,
-                     "phase-3 time = max(D, cpu) + gamma x min(D, cpu), the form of a buffered scan; indexed by the "
-                     "size of a batch's files, not N (at SF100 both are set by work_mem; chosen after the Q3 x SF1000 "
-                     "blind test, where N = 512 but files as SF100 / 64MB's: to be checked by a new blind test); "
-                     "clamped. Per run " + "; ".join(f"{m:.0f} MiB: {', '.join(f'{g:.2f}' for g in v)}"
-                                                    for m, v in sorted(gammas.items()))))
 
 
 def sf100_params(cfg: Config, params: ParamSet) -> None:
     """The terms without a microbenchmark, from Q3 x SF100.
 
-    Adds page_cache_window_MiB and clock_GHz_vs_on_cpu (64MB and 256MB, N = 64 / 16, session v2), and
-    burst_wait_per_burst_s (curve over N: those two and 8MB / 16MB / 64MB of the read-back session,
-    N = 512 / 256 / 64). Target plans come from EXPLAIN (no execution).
+    Adds page_cache_window_MiB and clock_GHz_vs_on_cpu (64MB and 256MB, N = 64 / 16, session v2).
+    Target plans come from EXPLAIN (no execution). (burst_wait_per_burst_s was fitted here on all five
+    conditions until 2026-11-19; it now comes from M5 in bench_params.)
     """
     from .evaluate import workload_for
-    conditions = [(64, "q3_sf100_v2_64MB", "64MB"), (16, "q3_sf100_v2_256MB", "256MB"),
-                  (512, "q3_sf100_rb_8MB", "8MB"), (256, "q3_sf100_rb_16MB", "16MB"), (64, "q3_sf100_rb_64MB", "64MB")]
+    conditions = [(64, "q3_sf100_v2_64MB", "64MB"), (16, "q3_sf100_v2_256MB", "256MB")]
     v2 = ("q3_sf100_v2_64MB", "q3_sf100_v2_256MB")
-    sources = [dataset for _, dataset, _ in conditions]
-    startup_wait = params.value("startup_wait_s")
-    windows, burst_wait, clock_points = [], {}, []
+    windows, clock_points = [], []
     for nbatch, dataset, work_mem in conditions:
         runs = data.load(cfg, dataset, "calibrate")
         work = workload_for(cfg, params, "q3", 100, {"work_mem": work_mem},
@@ -350,28 +395,15 @@ def sf100_params(cfg: Config, params: ParamSet) -> None:
         biggest = max(work.joins, key=lambda j: j.temp_bytes)
         temp_mib, outer_temp_mib = work.temp_bytes / MiB, biggest.outer_temp_bytes / MiB
         for run in runs:
-            phases = run.phases
-            if dataset in v2:
-                # cache window: the outer batch files still cached = temp - temp read from the device
-                windows.append((temp_mib - phases["p3_dev_read_MiB"]) * (biggest.outer_scan_mib + outer_temp_mib)
-                               / outer_temp_mib)
-                clock_points.append((run.on_cpu, run.ghz))
-            scan_rows = run.timeline[:len(run.timeline) - phases["p3_len_s"]]
-            scan_cpu_s = sum(min(x["backend_cpu_pct"], 100) / 100 for x in scan_rows)
-            scan_mib = sum(x["dev_rMBps"] for x in scan_rows)
-            readahead = interp(params.value("scan_wait_frac"), scan_cpu_s / (scan_mib * 8) * 1000) * scan_cpu_s
-            unexplained = phases["off_p12_s"] - startup_wait - readahead
-            burst_wait.setdefault(nbatch, []).append(
-                unexplained / (params.value("burst_s_per_GiB") * work.temp_bytes / 2**30))
+            # cache window: the outer batch files still cached = temp - temp read from the device
+            windows.append((temp_mib - run.phases["p3_dev_read_MiB"]) * (biggest.outer_scan_mib + outer_temp_mib)
+                           / outer_temp_mib)
+            clock_points.append((run.on_cpu, run.ghz))
 
     params.add(Param("page_cache_window_MiB", _median(windows), "MiB", "train", list(v2),
                      "the most recent data the page cache still holds when the batches are read back; "
                      f"per run {', '.join(f'{x / 1024:.0f}' for x in windows)} GiB, against ~56 GiB of RAM free "
                      "for the cache (hypothesis: once-touched pages only get the inactive list)"))
-    params.add(Param("burst_wait_per_burst_s", [[n, _median(v)] for n, v in sorted(burst_wait.items())],
-                     "N batches -> s per burst-second", "train", sources,
-                     "off-CPU time during the table scans beyond start-up and readahead waits, per second of "
-                     "writeback burst (burst_s_per_GiB x temp written)"))
     intercept, slope = _least_squares([d for d, _ in clock_points], [f for _, f in clock_points])
     lowest = min(d for d, _ in clock_points)
     params.add(Param("clock_GHz_vs_on_cpu", [[lowest, intercept + slope * lowest], [1.0, intercept + slope]],

@@ -125,24 +125,41 @@ def test_temp_from_device_keeps_the_tail_of_the_outer_files():
 def _spill_params():
     P = _params()
     for name, v in [("q.user_cycles_per_spilled_tuple", 0.0), ("q.kernel_cycles_per_temp_page", 0.0),
-                    ("readback_bw_MiBps", [[64, 100.0]]), ("readback_batch_overhead_s", 0.0), ("burst_wait_per_burst_s", [[64, 0.0]]),
-                    ("burst_s_per_GiB", 0.0), ("readback_cycles_share", 0.25),
-                    ("readback_overlap_gamma", [[10.0, 0.5]]), ("clock_readback_GHz_vs_on_cpu", [[0.5, 2.0], [1.0, 2.0]])]:
+                    ("burst_wait_per_burst_s", [[64, 0.0]]), ("burst_s_per_GiB", 0.0), ("readback_cycles_share", 0.25),
+                    ("readback_wait_per_extent_s", 0.02), ("writeback_expire_s", 30.0), ("mballoc_window_MiB", 8.0),
+                    ("start_extents_vs_chunk_MiB", [[3.0, 3.0], [8.0, 1.0]]),
+                    ("clock_readback_GHz_vs_on_cpu", [[0.5, 2.0], [1.0, 2.0]])]:
         P.add(Param(name, v, "", "train"))
     P["page_cache_window_MiB"].value = 0.0                   # every temp page from the device
     return P
 
 
-def test_readback_phase_is_max_plus_gamma_min():
+def test_extents_per_file_windows_and_chunks():
+    from tpch.model.cost import extents_per_file
+    start = [[3.0, 3.0], [8.0, 1.0]]
+    assert extents_per_file(100.0, 25.0, 8.0, start) == pytest.approx(4.0)        # chunks >= window: size / chunk
+    assert extents_per_file(40.0, 3.0, 8.0, start) == pytest.approx(3.0 + 4.0)    # first window + 8 MiB windows
+    assert extents_per_file(4.0, 3.0, 8.0, start) == pytest.approx(1.5)           # small file: part of the first window
+    assert extents_per_file(40.0, 8.0, 8.0, start) == pytest.approx(5.0)          # continuous at chunk = window
+
+
+def test_readback_phase_is_cpu_plus_extent_jumps():
+    # 64 batches: 63 inner files of 200/63 MiB and 63 outer files of 800/63 MiB; no outer scan, so the inner
+    # side takes all of phases 1-2 and the outer files are written at once (one extent each)
     j = HashJoinSpill("h", 64, 1, 0, 0, 16, 16, 0, temp_bytes=1000 * MiB, outer_temp_bytes=800 * MiB,
                       outer_scan_mib=0)
     w = Workload("q", 100, 10, {}, 10.0, scans=[Scan("lineitem", 128_000, 1e6)], joins=[j])
-    p = predict(w, _spill_params())
-    device_s, cpu3 = 1000 / 100.0, p.parts["phase3_cpu_s"]
+    P = _spill_params()
+    p = predict(w, P)
+    cpu3 = p.parts["phase3_cpu_s"]
     assert p.parts["phase3_clock_GHz"] == pytest.approx(2.0)
     assert cpu3 == pytest.approx(p.parts["phase3_cycles"] / 2e9)
     assert p.parts["phase3_cycles"] + p.parts["phase12_cycles"] == pytest.approx(p.cycles)
-    assert p.parts["phase3_s"] == pytest.approx(max(device_s, cpu3) + 0.5 * min(device_s, cpu3))
+    from tpch.model.cost import batch_file_extents
+    outer_s = p.parts["phase12_s"] * min(1.0, 0 / w.table_mib)
+    extents = batch_file_extents(j, P, p.parts["phase12_s"] - outer_s, outer_s)
+    assert p.parts["phase3_extents"] == pytest.approx(extents)
+    assert p.parts["phase3_s"] == pytest.approx(max(1000 / 1000.0, cpu3) + 0.02 * extents)
     assert p.time_s == pytest.approx(p.parts["phase12_s"] + p.parts["phase3_s"])
 
 

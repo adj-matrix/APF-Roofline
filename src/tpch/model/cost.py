@@ -22,9 +22,12 @@ The model, in the symbols the reports use (docs/7), and the names this code uses
     W  wait_s         off-CPU time: start-up
                                  + readahead waits of the table scans (or the I/O time beyond the CPU
                                    time, if the scan is I/O-bound)
-                                 + phase 3: max(D, cpu3) + gamma x min(D, cpu3) - cpu3, D the device time
-                                   of the batch files at the read-back rate for N files, gamma by the size
-                                   of a batch's files
+                                 + phase 3: the batch files' extents read from the device x the wait per
+                                   extent (hardware/readback_cpu.py: each jump to another extent costs a few
+                                   mechanical accesses that a one-window readahead cannot hide, whatever
+                                   the CPU time between reads); extents from the files' sizes and write
+                                   rates (ext4: a file grows by rate x writeback expiry per allocation,
+                                   allocations below mballoc's window are rounded up to it)
                                  + writeback-burst waits during the scans
 
 Only cold runs on the big volume (SF >= 100, tables read from sdb) are modelled.
@@ -100,15 +103,43 @@ def temp_read_from_device_mib(workload: Workload, cache_window_mib: float) -> fl
     return from_device
 
 
-def readback_rate_mibps(params: ParamSet, join: HashJoinSpill) -> float:
-    """Device rate (MiB/s) at which a join's batch files are read back (hardware/temp_spill.py).
+def extents_per_file(size_mib: float, chunk_mib: float, window_mib: float, start_curve: list) -> float:
+    """On-disk extents of one batch file (hardware/layout_rate.sh, queries/q3/sf1000/layout_tempfiles.sh).
 
-    Each batch (its inner and outer file) costs a fixed time plus its size at a bandwidth that falls
-    with the number of batch files: rate = s / (overhead + s / bw(N)), s = MiB per batch.
+    Delayed allocation places a file's dirty data when writeback takes it: about every expiry period,
+    `chunk_mib` = write rate x expiry (the whole file if it is written faster). Interleaved writers make
+    each allocation an extent of its own, except that ext4's mballoc rounds a request below its window
+    (8 MiB) up to an aligned window and keeps the rest for the file's next writes: slow files get
+    window-sized extents, after a few smaller ones at the start while the file is small
+    (start_curve: extents of the first window vs chunk, measured).
+
+    Args:
+        size_mib: the file's final size.
+        chunk_mib: MiB the file grows by between two writebacks (at most its size).
+        window_mib: mballoc's largest normalisation window.
+        start_curve: [[chunk MiB, extents in the first window], ...].
     """
-    per_batch = join.temp_bytes / MiB / join.nbatch
-    bandwidth = interp(params.value("readback_bw_MiBps"), join.nbatch)
-    return per_batch / (params.value("readback_batch_overhead_s") + per_batch / bandwidth)
+    if chunk_mib >= window_mib:
+        return max(1.0, size_mib / chunk_mib)
+    start = interp(start_curve, chunk_mib, log_x=False)
+    if size_mib <= window_mib:
+        return max(1.0, start * size_mib / window_mib)
+    return start + (size_mib - window_mib) / window_mib
+
+
+def batch_file_extents(join: HashJoinSpill, params: ParamSet, inner_write_s: float, outer_write_s: float) -> float:
+    """Extents of a join's batch files: N - 1 inner and N - 1 outer files (batch 0 stays in memory),
+    the inner side written over `inner_write_s`, the outer side over `outer_write_s`."""
+    files = join.nbatch - 1
+    expiry, window, start = (params.value("writeback_expire_s"), params.value("mballoc_window_MiB"),
+                             params.value("start_extents_vs_chunk_MiB"))
+    total = 0.0
+    for side_bytes, seconds in ((join.temp_bytes - join.outer_temp_bytes, inner_write_s),
+                                (join.outer_temp_bytes, outer_write_s)):
+        size = side_bytes / MiB / files
+        chunk = min(size, size / max(seconds, 1e-9) * expiry)
+        total += files * extents_per_file(size, chunk, window, start)
+    return total
 
 
 def predict(workload: Workload, params: ParamSet, iterations: int = 50) -> Prediction:
@@ -118,8 +149,9 @@ def predict(workload: Workload, params: ParamSet, iterations: int = 50) -> Predi
       phases 1-2  the table scans; the joins write their batch files (scan clock, by on-CPU share)
       phase 3     the batch files are read back and joined (read-back clock: there the backend waits
                   synchronously every 1-2 ms, and the clock falls much faster with the on-CPU share)
-    Phase 3's time has the same form as a scan's: max(D, cpu) + gamma x min(D, cpu), with D the device
-    time of the batch files read from the device and cpu its CPU time. A plan that does not spill has
+    Phase 3's time is max(cpu, stream) + extents x wait per extent: the CPU time or the transfer at the
+    volume's sequential rate, whichever is longer, plus the jumps between extents, which a readahead one
+    window ahead does not hide (hardware/readback_cpu.py: the wait does not shrink with CPU time). A plan that does not spill has
     phases 1-2 only (the single-phase model).
 
     Args:
@@ -169,13 +201,10 @@ def predict(workload: Workload, params: ParamSet, iterations: int = 50) -> Predi
     twin3 = user_twin * (1 - 1 / nbatch) if phase3_share else 0.0
     free12 = (1 - phase3_share) * base_cycles + user_write + (user_twin - twin3)
     free3 = phase3_share * base_cycles + user_read + twin3
-    readback_device_s = sum(temp_read_from_device_mib(_single_join(workload, j), window)
-                            / readback_rate_mibps(params, j) for j in spilling)
-    # overlap of the read-back with the CPU: better on longer batch files (readahead stays in steady state)
-    # (of the join that writes the most, as in calibrate.readback_params)
-    biggest_join = max(spilling, key=lambda j: j.temp_bytes) if spilling else None
-    batch_file_mib = biggest_join.temp_bytes / biggest_join.nbatch / MiB if spilling else 0.0
-    gamma = interp(pv("readback_overlap_gamma"), batch_file_mib) if phase3_share else 0.0
+    # per join: MiB read back from the device, and the share of its extents that the device serves
+    device_mib = {id(j): temp_read_from_device_mib(_single_join(workload, j), window) for j in spilling}
+    readback_stream_s = sum(device_mib.values()) / pv("bw_big_MiBps")
+    wait_per_extent = pv("readback_wait_per_extent_s") if phase3_share else 0.0
 
     # --- waits of phases 1-2 that do not depend on the clock ---------------------------------------
     wait_burst = sum(interp(pv("burst_wait_per_burst_s"), j.nbatch) * pv("burst_s_per_GiB") * j.temp_bytes / 2**30
@@ -197,7 +226,15 @@ def predict(workload: Workload, params: ParamSet, iterations: int = 50) -> Predi
         wait_scan = max(0.0, table_io_s - cpu12) + interp(pv("scan_wait_frac"), cpu_ms_per_128k) * cpu12
         wait12 = pv("startup_wait_s") + wait_scan + wait_burst
         time12 = cpu12 + wait12
-        time3 = (max(readback_device_s, cpu3) + gamma * min(readback_device_s, cpu3)) if phase3_share else 0.0
+        extents = 0.0
+        if phase3_share:
+            # the outer side's files are written while the outer side's tables are scanned, the inner's before
+            for j in spilling:
+                outer_s = time12 * min(1.0, j.outer_scan_mib / workload.table_mib) if workload.table_mib else time12
+                extents += (batch_file_extents(j, params, time12 - outer_s, outer_s)
+                            * device_mib[id(j)] / (j.temp_bytes / MiB))
+        wait_jumps = extents * wait_per_extent
+        time3 = max(readback_stream_s, cpu3) + wait_jumps if phase3_share else 0.0
         new12 = interp(scan_curve, cpu12 / time12, log_x=False)
         new3 = interp(readback_curve, cpu3 / time3, log_x=False) if phase3_share else new12
         if abs(new12 - clock12) < 1e-6 and abs(new3 - clock3) < 1e-6:
@@ -219,7 +256,8 @@ def predict(workload: Workload, params: ParamSet, iterations: int = 50) -> Predi
              "W_burst_s": wait_burst, "W_temp_s": time3 - cpu3,
              "phase12_s": time12, "phase12_cpu_s": cpu12, "phase12_cycles": cycles12, "phase3_cycles": cycles3, "phase12_clock_GHz": clock12,
              "phase3_s": time3, "phase3_cpu_s": cpu3, "phase3_clock_GHz": clock3 if phase3_share else 0.0,
-             "phase3_device_s": readback_device_s, "gamma": gamma, "batch_file_MiB": batch_file_mib, "temp_dev_MiB": temp_from_device_mib,
+             "phase3_stream_s": readback_stream_s, "phase3_extents": extents, "W_jump_s": wait_jumps,
+             "temp_dev_MiB": temp_from_device_mib,
              "temp_MiB": workload.temp_bytes / MiB}
     return Prediction(query=q, sf=workload.sf, settings=workload.settings, time_s=time_s, time_range_s=(low, high),
                       cycles=cycles, user_cycles=user, kernel_cycles=cycles - user, clock_ghz=clock,

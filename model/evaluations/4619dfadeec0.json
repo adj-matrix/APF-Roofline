@@ -1,0 +1,110 @@
+{
+ "params_digest": "4619dfadeec0",
+ "conditions": {
+  "q6_sf100": {
+   "role": "test",
+   "time_s": 142.58790563108778,
+   "measured_time_s": 142.76185154914856
+  },
+  "q6_sf100_recheck": {
+   "role": "test",
+   "time_s": 142.58790563108778,
+   "measured_time_s": 142.6278314590454
+  },
+  "q1_sf100": {
+   "role": "test",
+   "time_s": 691.5030721693423,
+   "measured_time_s": 692.6581230163574
+  },
+  "q3_sf100_64MB": {
+   "role": "test",
+   "time_s": 348.6696857962676,
+   "measured_time_s": 353.78349590301514
+  },
+  "q3_sf100_128MB": {
+   "role": "test",
+   "time_s": 336.74607557439055,
+   "measured_time_s": 338.2258048057556
+  },
+  "q3_sf100_v2_64MB": {
+   "role": "train",
+   "time_s": 348.6696857962676,
+   "measured_time_s": 348.9138009548187
+  },
+  "q3_sf100_v2_256MB": {
+   "role": "train",
+   "time_s": 328.6262390389514,
+   "measured_time_s": 326.1310179233551
+  },
+  "q3_sf100_rb_8MB": {
+   "role": "train",
+   "time_s": 480.810160121382,
+   "measured_time_s": 484.7228798866272
+  },
+  "q3_sf100_rb_16MB": {
+   "role": "train",
+   "time_s": 412.637555207441,
+   "measured_time_s": 423.3730134963989
+  },
+  "q3_sf100_rb_64MB": {
+   "role": "train",
+   "time_s": 348.6696857962676,
+   "measured_time_s": 353.17175555229187
+  },
+  "q6_sf1000": {
+   "role": "blind",
+   "time_s": 1418.465941032884,
+   "measured_time_s": 1458.4484341144562
+  },
+  "q6_sf100_control": {
+   "role": "test",
+   "time_s": 142.58790563108778,
+   "measured_time_s": 141.57185578346252
+  },
+  "q1_sf1000": {
+   "role": "blind",
+   "time_s": 6908.540140953279,
+   "measured_time_s": 7095.780076980591
+  },
+  "q1_sf100_control": {
+   "role": "test",
+   "time_s": 691.5030721693423,
+   "measured_time_s": 691.823326587677
+  },
+  "q3_sf1000": {
+   "role": "blind",
+   "time_s": 4887.667497663244,
+   "measured_time_s": 4997.229519367218
+  },
+  "q3_sf100_control": {
+   "role": "test",
+   "time_s": 348.6696857962676,
+   "measured_time_s": 352.472074508667
+  },
+  "q3_sf1000_128MB": {
+   "role": "blind",
+   "time_s": 4630.71706396299,
+   "measured_time_s": 4695.048643112183
+  },
+  "q3_sf100_control_128MB": {
+   "role": "test",
+   "time_s": 336.74607557439055,
+   "measured_time_s": 342.8791136741638
+  },
+  "q3_sf100_32MB": {
+   "role": "blind",
+   "time_s": 373.85304428603837,
+   "measured_time_s": 370.2782766819
+  },
+  "q3_sf1000_256MB": {
+   "role": "blind",
+   "time_s": 4191.508536277961,
+   "measured_time_s": 4223.108884572983
+  },
+  "q3_sf100_control_256MB": {
+   "role": "test",
+   "time_s": 328.6262390389514,
+   "measured_time_s": 331.67019152641296
+  }
+ }
+}
