@@ -1,0 +1,131 @@
+{
+ "query": "q1",
+ "sf": 100,
+ "params_digest": "8402a6f5657e",
+ "replica": [
+  "results/bench/20261120-002725_iostack_m7",
+  "results/bench/20261120-014441_iostack_m7b",
+  "results/bench/20261120-022430_iostack_m7c",
+  "results/bench/20261120-024700_iostack_m7d"
+ ],
+ "dU_per_read": 76295.65787942133,
+ "base": {
+  "time_s": 691.5030721693423,
+  "U": 2182773405360.0,
+  "K": 168129205921.72412,
+  "K_device": 142958257285.30844,
+  "n_reads": 703419.875,
+  "start_s": 1.3995775097861358
+ },
+ "cells": [
+  {
+   "io_method": "sync",
+   "io_direct": "off",
+   "extra": {},
+   "time_s": 691.5030721693423,
+   "cycles": 2350902611281.724,
+   "user_cycles": 2182773405360.0,
+   "kernel_cycles": 168129205921.72412,
+   "clock_ghz": 3.43371263806345,
+   "off_cpu_s": 3.452736677836487,
+   "note": "base prediction; replica psync direct=0: f 3.389, k/read 212.7k, off/read 4.9 us",
+   "check": {
+    "other_cpu_s": 0.0,
+    "replica_time_s": 698.5743660217753
+   },
+   "model": "v2"
+  },
+  {
+   "io_method": "sync",
+   "io_direct": "data",
+   "extra": {},
+   "time_s": 721.87217272825,
+   "cycles": 2253668048308.9,
+   "user_cycles": 2182773405360.0,
+   "kernel_cycles": 70894642948.9,
+   "clock_ghz": 3.4525400117081024,
+   "off_cpu_s": 67.71606215400705,
+   "note": "replica psync direct=1: f 3.453, k/read 65.0k, off/read 96.3 us",
+   "check": {
+    "other_cpu_s": 0.0
+   },
+   "model": "v2 (u 3091k outside the scan family 309k-947k)"
+  },
+  {
+   "io_method": "worker",
+   "io_direct": "off",
+   "extra": {},
+   "time_s": 632.9123179356917,
+   "cycles": 2154276471867.8306,
+   "user_cycles": 2129105523231.4148,
+   "kernel_cycles": 25170948636.41568,
+   "clock_ghz": 3.4256367140020005,
+   "off_cpu_s": 2.643817150297501,
+   "note": "pool replica direct=off x3: f 3.426, off/read 3.8 us",
+   "check": {
+    "worker_cpu_s": 65.8725144541087
+   },
+   "model": "v2 (u 3027k outside the scan family 263k-893k)"
+  },
+  {
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "extra": {},
+   "time_s": 645.2256241300395,
+   "cycles": 2247233665415.61,
+   "user_cycles": 2182773405360.0,
+   "kernel_cycles": 64460260055.60973,
+   "clock_ghz": 3.494091645665653,
+   "off_cpu_s": 0.6735785951928732,
+   "note": "replica uring direct=1: f 3.494, k/read 55.9k, off/read 1.0 us",
+   "check": {
+    "other_cpu_s": 0.0
+   },
+   "model": "v2"
+  }
+ ],
+ "du_direct_per_read": 12495.19096646685,
+ "scan_runs": {
+  "worker/off": {
+   "lineitem_light": [
+    "20261122-153752_scan.lineitem_light_sf100_plain_cold_iostack_m8_worker_off_r0",
+    "20261122-161636_scan.lineitem_light_sf100_plain_cold_iostack_m9_worker_off_r0",
+    "20261122-162904_scan.lineitem_light_sf100_plain_cold_iostack_m10_worker_off_r0",
+    "20261122-164037_scan.lineitem_light_sf100_plain_cold_iostack_m10_worker_off_r0"
+   ],
+   "lineitem_mid": [
+    "20261122-163114_scan.lineitem_mid_sf100_plain_cold_iostack_m10_worker_off_r0",
+    "20261122-164816_scan.lineitem_mid_sf100_plain_cold_iostack_m10_worker_off_r0"
+   ],
+   "lineitem_min": [
+    "20261122-163502_scan.lineitem_min_sf100_plain_cold_iostack_m10_worker_off_r0",
+    "20261122-165206_scan.lineitem_min_sf100_plain_cold_iostack_m10_worker_off_r0"
+   ]
+  },
+  "sync/off": {
+   "lineitem_light": [
+    "20261122-154504_scan.lineitem_light_sf100_plain_cold_iostack_m8_sync_off_r0"
+   ]
+  },
+  "worker/data": {
+   "lineitem_light": [
+    "20261122-154755_scan.lineitem_light_sf100_plain_cold_iostack_m8_worker_data_r0"
+   ]
+  },
+  "sync/data": {
+   "lineitem_light": [
+    "20261122-155324_scan.lineitem_light_sf100_plain_cold_iostack_m9_sync_data_r0",
+    "20261122-161904_scan.lineitem_light_sf100_plain_cold_iostack_m10_sync_data_r0",
+    "20261122-165743_scan.lineitem_light_sf100_plain_cold_iostack_m10_sync_data_r0"
+   ],
+   "lineitem_mid": [
+    "20261122-162330_scan.lineitem_mid_sf100_plain_cold_iostack_m10_sync_data_r0",
+    "20261122-164246_scan.lineitem_mid_sf100_plain_cold_iostack_m10_sync_data_r0"
+   ],
+   "lineitem_min": [
+    "20261122-163636_scan.lineitem_min_sf100_plain_cold_iostack_m10_sync_data_r0",
+    "20261122-165339_scan.lineitem_min_sf100_plain_cold_iostack_m10_sync_data_r0"
+   ]
+  }
+ }
+}

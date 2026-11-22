@@ -1,0 +1,154 @@
+{
+ "query": "q6",
+ "sf": 100,
+ "params_digest": "8402a6f5657e",
+ "m1": {
+  "short_idle_GHz_vs_on_cpu": [
+   [
+    0.5399380263157894,
+    1.240080526212541
+   ],
+   [
+    0.6929793421052631,
+    1.2924041490209832
+   ],
+   [
+    0.8663725,
+    2.4575163794700607
+   ],
+   [
+    0.9581886842105263,
+    3.270487236400248
+   ],
+   [
+    0.9999471052631579,
+    3.4618533569491143
+   ]
+  ],
+  "wakers3_GHz": 3.0995906684039762
+ },
+ "base": {
+  "time_s": 142.58790563108778,
+  "U": 326325059990.0,
+  "K": 148073787207.8465,
+  "K_device": 142958257285.30844,
+  "io_s": 80.43590834413008,
+  "clock_ghz": 3.4094308589420006
+ },
+ "cells": [
+  {
+   "io_method": "sync",
+   "io_direct": "off",
+   "time_s": 142.58790563108778,
+   "time_range_s": [
+    137.42150598615203,
+    147.83779949745627
+   ],
+   "cpu_s": 139.14312001770872,
+   "io_s": 80.43590834413008,
+   "backend_cycles": 474398847197.8465,
+   "clock_ghz": 3.4094308589420006,
+   "clock_range_ghz": [
+    3.4094308589420006,
+    3.4094308589420006
+   ],
+   "on_cpu_share": 0.9758409691331632,
+   "note": "base prediction"
+  },
+  {
+   "io_method": "sync",
+   "io_direct": "data",
+   "time_s": 298.009809325858,
+   "time_range_s": [
+    228.53187468387142,
+    298.009809325858
+   ],
+   "cpu_s": 216.17432347194176,
+   "io_s": 80.43590834413008,
+   "backend_cycles": 331440589912.5381,
+   "clock_ghz": 1.533209793787361,
+   "clock_range_ghz": [
+    1.533209793787361,
+    2.259364341249949
+   ],
+   "on_cpu_share": 0.7288161374216907,
+   "note": "cpu + io serialized; clock: M1 short idles (point) .. base long idles"
+  },
+  {
+   "io_method": "worker",
+   "io_direct": "off",
+   "time_s": 108.33001619355001,
+   "time_range_s": [
+    97.45295014131084,
+    108.33001619355001
+   ],
+   "cpu_s": 106.93043868376387,
+   "io_s": 80.43590834413008,
+   "backend_cycles": 331440589912.5381,
+   "clock_ghz": 3.0995906684039762,
+   "clock_range_ghz": [
+    3.0995906684039762,
+    3.4505877392144724
+   ],
+   "on_cpu_share": 1.0,
+   "note": "max(cpu without the page-cache copy, io); I/O workers wake other cores"
+  },
+  {
+   "io_method": "worker",
+   "io_direct": "data",
+   "time_s": 108.33001619355001,
+   "time_range_s": [
+    97.45295014131084,
+    108.33001619355001
+   ],
+   "cpu_s": 106.93043868376387,
+   "io_s": 80.43590834413008,
+   "backend_cycles": 331440589912.5381,
+   "clock_ghz": 3.0995906684039762,
+   "clock_range_ghz": [
+    3.0995906684039762,
+    3.4505877392144724
+   ],
+   "on_cpu_share": 1.0,
+   "note": "max(cpu without the page-cache copy, io); I/O workers wake other cores"
+  },
+  {
+   "io_method": "io_uring",
+   "io_direct": "off",
+   "time_s": 142.58790563108778,
+   "time_range_s": [
+    137.42150598615203,
+    147.83779949745627
+   ],
+   "cpu_s": 139.14312001770872,
+   "io_s": 80.43590834413008,
+   "backend_cycles": 474398847197.8465,
+   "clock_ghz": 3.4094308589420006,
+   "clock_range_ghz": [
+    3.4094308589420006,
+    3.4094308589420006
+   ],
+   "on_cpu_share": 0.9758409691331632,
+   "note": "base prediction; buffered io_uring completes in the backend"
+  },
+  {
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "time_s": 97.45295014131084,
+   "time_range_s": [
+    97.45295014131084,
+    97.45295014131084
+   ],
+   "cpu_s": 96.0533726315247,
+   "io_s": 80.43590834413008,
+   "backend_cycles": 331440589912.5381,
+   "clock_ghz": 3.4505877392144724,
+   "clock_range_ghz": [
+    3.4505877392144724,
+    3.4505877392144724
+   ],
+   "on_cpu_share": 1.0,
+   "note": "max(cpu without the page-cache copy, io)"
+  }
+ ]
+}

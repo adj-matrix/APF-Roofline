@@ -1,0 +1,163 @@
+{
+ "query": "q6",
+ "sf": 100,
+ "params_digest": "8402a6f5657e",
+ "replica": [
+  "results/bench/20261120-002725_iostack_m7",
+  "results/bench/20261120-014441_iostack_m7b",
+  "results/bench/20261120-022430_iostack_m7c",
+  "results/bench/20261120-024700_iostack_m7d"
+ ],
+ "dU_per_read": 60784.09208399651,
+ "base": {
+  "time_s": 142.58790563108778,
+  "U": 326325059990.0,
+  "K": 148073787207.8465,
+  "K_device": 142958257285.30844,
+  "n_reads": 703419.875,
+  "start_s": 1.3995775097861358
+ },
+ "cells": [
+  {
+   "io_method": "sync",
+   "io_direct": "off",
+   "extra": {},
+   "time_s": 142.58790563108778,
+   "cycles": 474398847197.8465,
+   "user_cycles": 326325059990.0,
+   "kernel_cycles": 148073787207.8465,
+   "clock_ghz": 3.4094308589420006,
+   "off_cpu_s": 3.452736677836487,
+   "note": "base prediction; replica psync direct=0: f 3.389, k/read 212.7k, off/read 4.9 us",
+   "check": {
+    "other_cpu_s": 0.0,
+    "replica_time_s": 144.84149965473952
+   },
+   "model": "v2"
+  },
+  {
+   "io_method": "sync",
+   "io_direct": "data",
+   "extra": {},
+   "time_s": 243.1608529653834,
+   "cycles": 362416183354.2507,
+   "user_cycles": 317535694322.2667,
+   "kernel_cycles": 44880489031.983955,
+   "clock_ghz": 2.0810969693022785,
+   "off_cpu_s": 67.61456883877077,
+   "note": "scan family lineitem_min 309k, lineitem_light 455k, lineitem_mid 947k: f 2.081, k/read 63.8k, off/read 96.1 us",
+   "check": {
+    "other_cpu_s": 0.0
+   },
+   "model": "v3"
+  },
+  {
+   "io_method": "worker",
+   "io_direct": "off",
+   "extra": {},
+   "time_s": 100.70668403544173,
+   "cycles": 288651738806.9879,
+   "user_cycles": 283568321534.2867,
+   "kernel_cycles": 5083417272.701218,
+   "clock_ghz": 2.9406602732890996,
+   "off_cpu_s": 1.1482877634550133,
+   "note": "scan family lineitem_min 263k, lineitem_light 406k, lineitem_mid 893k: f 2.941, k/read 7.2k, off/read 1.6 us",
+   "check": {
+    "worker_cpu_s": 59.13079405901317
+   },
+   "model": "v3"
+  },
+  {
+   "io_method": "worker",
+   "io_direct": "data",
+   "extra": {},
+   "time_s": 90.4505778308962,
+   "cycles": 288683851456.8247,
+   "user_cycles": 283568321534.2867,
+   "kernel_cycles": 5115529922.538055,
+   "clock_ghz": 3.342397950997098,
+   "off_cpu_s": 2.6807189574845407,
+   "note": "pool replica direct=data x3: f 3.342, off/read 3.8 us",
+   "check": {
+    "worker_cpu_s": 28.395322027310094
+   },
+   "model": "v2"
+  },
+  {
+   "io_method": "io_uring",
+   "io_direct": "off",
+   "extra": {},
+   "time_s": 117.63894093506167,
+   "cycles": 337236193307.03754,
+   "user_cycles": 326325059990.0,
+   "kernel_cycles": 10911133317.037535,
+   "clock_ghz": 3.3078733034825203,
+   "off_cpu_s": 14.289813860606223,
+   "note": "replica uring direct=0: f 3.308, k/read 8.2k, off/read 20.3 us",
+   "check": {
+    "other_cpu_s": 41.87649132539579
+   },
+   "model": "v2"
+  },
+  {
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "extra": {},
+   "time_s": 109.79271266751421,
+   "cycles": 364775717471.98486,
+   "user_cycles": 326325059990.0,
+   "kernel_cycles": 38450657481.984856,
+   "clock_ghz": 3.4121098410903556,
+   "off_cpu_s": 1.4869291853496993,
+   "note": "replica uring direct=1: f 3.412, k/read 47.4k, off/read 2.1 us",
+   "check": {
+    "other_cpu_s": 0.0
+   },
+   "model": "v2"
+  }
+ ],
+ "du_direct_per_read": 12495.19096646685,
+ "scan_runs": {
+  "worker/off": {
+   "lineitem_light": [
+    "20261122-153752_scan.lineitem_light_sf100_plain_cold_iostack_m8_worker_off_r0",
+    "20261122-161636_scan.lineitem_light_sf100_plain_cold_iostack_m9_worker_off_r0",
+    "20261122-162904_scan.lineitem_light_sf100_plain_cold_iostack_m10_worker_off_r0",
+    "20261122-164037_scan.lineitem_light_sf100_plain_cold_iostack_m10_worker_off_r0"
+   ],
+   "lineitem_mid": [
+    "20261122-163114_scan.lineitem_mid_sf100_plain_cold_iostack_m10_worker_off_r0",
+    "20261122-164816_scan.lineitem_mid_sf100_plain_cold_iostack_m10_worker_off_r0"
+   ],
+   "lineitem_min": [
+    "20261122-163502_scan.lineitem_min_sf100_plain_cold_iostack_m10_worker_off_r0",
+    "20261122-165206_scan.lineitem_min_sf100_plain_cold_iostack_m10_worker_off_r0"
+   ]
+  },
+  "sync/off": {
+   "lineitem_light": [
+    "20261122-154504_scan.lineitem_light_sf100_plain_cold_iostack_m8_sync_off_r0"
+   ]
+  },
+  "worker/data": {
+   "lineitem_light": [
+    "20261122-154755_scan.lineitem_light_sf100_plain_cold_iostack_m8_worker_data_r0"
+   ]
+  },
+  "sync/data": {
+   "lineitem_light": [
+    "20261122-155324_scan.lineitem_light_sf100_plain_cold_iostack_m9_sync_data_r0",
+    "20261122-161904_scan.lineitem_light_sf100_plain_cold_iostack_m10_sync_data_r0",
+    "20261122-165743_scan.lineitem_light_sf100_plain_cold_iostack_m10_sync_data_r0"
+   ],
+   "lineitem_mid": [
+    "20261122-162330_scan.lineitem_mid_sf100_plain_cold_iostack_m10_sync_data_r0",
+    "20261122-164246_scan.lineitem_mid_sf100_plain_cold_iostack_m10_sync_data_r0"
+   ],
+   "lineitem_min": [
+    "20261122-163636_scan.lineitem_min_sf100_plain_cold_iostack_m10_sync_data_r0",
+    "20261122-165339_scan.lineitem_min_sf100_plain_cold_iostack_m10_sync_data_r0"
+   ]
+  }
+ }
+}

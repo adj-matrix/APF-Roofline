@@ -26,8 +26,8 @@ CACHES = ("cold", "warm")
 # Recorded in meta.json for every run, whatever their source.
 RECORDED_SETTINGS = [
     "server_version", "shared_buffers", "work_mem", "effective_io_concurrency", "io_method",
-    "io_combine_limit", "jit", "max_parallel_workers_per_gather", "track_io_timing",
-    "random_page_cost", "seq_page_cost", "enable_hashjoin", "enable_mergejoin", "enable_nestloop",
+    "io_combine_limit", "io_workers", "debug_io_direct", "jit", "max_parallel_workers_per_gather",
+    "track_io_timing", "random_page_cost", "seq_page_cost", "enable_hashjoin", "enable_mergejoin", "enable_nestloop",
 ]
 
 
@@ -118,8 +118,9 @@ def _measure(cfg: Config, sf: int, run: Path, sql: str, mode: str, cache_state: 
         device = cfg.device(sf)             # sda for SF1/SF10, sdb for SF >= BIG_SF_MIN
         perf_interval = cfg.int("PERF_INTERVAL_MS") if "PERF_INTERVAL_MS" in cfg.values else 0
         record_hz = cfg.int("PERF_RECORD_HZ") if "PERF_RECORD_HZ" in cfg.values and perf_events else 0
+        no_inherit = cfg.int("PERF_NO_INHERIT") == 1
         with Monitors(run, device=device, pid=pid, interval=interval, perf_events=perf_events,
-                      perf_interval_ms=perf_interval, perf_record_hz=record_hz) as mon:
+                      perf_interval_ms=perf_interval, perf_record_hz=record_hz, perf_no_inherit=no_inherit) as mon:
             time.sleep(interval)            # one idle sample before the query starts (perf attaches)
             c0 = counters.snapshot(device, pid)
             t_start = time.time()

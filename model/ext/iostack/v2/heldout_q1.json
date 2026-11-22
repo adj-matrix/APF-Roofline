@@ -1,0 +1,80 @@
+{
+ "query": "q1",
+ "sf": 100,
+ "params_digest": "8402a6f5657e",
+ "replica": [
+  "results/bench/20261120-002725_iostack_m7",
+  "results/bench/20261120-014441_iostack_m7b",
+  "results/bench/20261120-022430_iostack_m7c",
+  "results/bench/20261120-024700_iostack_m7d"
+ ],
+ "dU_per_read": 76295.65787942133,
+ "base": {
+  "time_s": 691.5030721693423,
+  "U": 2182773405360.0,
+  "K": 168129205921.72412,
+  "K_device": 142958257285.30844,
+  "n_reads": 703419.875,
+  "start_s": 1.3995775097861358
+ },
+ "cells": [
+  {
+   "io_method": "worker",
+   "io_direct": "data",
+   "extra": {},
+   "time_s": 633.9990662380725,
+   "cycles": 2154276471867.8306,
+   "user_cycles": 2129105523231.4148,
+   "kernel_cycles": 25170948636.41568,
+   "clock_ghz": 3.415431512741811,
+   "off_cpu_s": 1.851525013903841,
+   "note": "pool replica direct=data x3: f 3.415, off/read 2.6 us",
+   "check": {
+    "worker_cpu_s": 31.224645386532387
+   }
+  },
+  {
+   "io_method": "io_uring",
+   "io_direct": "off",
+   "extra": {},
+   "time_s": 659.1106559990461,
+   "cycles": 2241668633220.6904,
+   "user_cycles": 2182773405360.0,
+   "kernel_cycles": 58895227860.69057,
+   "clock_ghz": 3.4197031077280857,
+   "off_cpu_s": 2.1955081010557667,
+   "note": "replica uring direct=0: f 3.420, k/read 47.9k, off/read 3.1 us",
+   "check": {
+    "other_cpu_s": 46.864005527293536
+   }
+  }
+ ],
+ "dU_source": {
+  "dU": 76295.65787942133,
+  "n": 70336.515625,
+  "U_self": 220423283689.22223,
+  "U_worker": 215056912956.66666,
+  "cells": {
+   "worker_off": [
+    216.5,
+    214.46,
+    214.21
+   ],
+   "sync_off": [
+    219.11,
+    223.6,
+    218.68
+   ],
+   "io_uring_data": [
+    220.86,
+    219.64,
+    219.02
+   ],
+   "sync_data": [
+    224.88,
+    220.16,
+    217.84
+   ]
+  }
+ }
+}

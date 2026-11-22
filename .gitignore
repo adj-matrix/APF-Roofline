@@ -2,7 +2,7 @@
 /.venv
 /.vscode
 /results
-/**/*.md
+/docs/**/*.*
 .nfs*
 
 ### Python

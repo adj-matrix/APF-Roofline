@@ -31,8 +31,11 @@ def pidstat_cmd(pid: int, interval: int = 1) -> list[str]:
     return ["pidstat", "-u", "-d", "-h", "-H", "-p", str(pid), str(interval)]
 
 
-def perf_stat_cmd(pid: int, events: str, interval_ms: int = 0) -> list[str]:
+def perf_stat_cmd(pid: int, events: str, interval_ms: int = 0, no_inherit: bool = False) -> list[str]:
     """Counting mode on one process; CSV totals on stderr when perf gets SIGINT.
+
+    no_inherit: count only the threads that exist when perf attaches. A backend that uses io_uring gets kernel
+    io-wq threads later (threads of its process); by default perf counts them into the backend.
 
     Runs through sudo (hardware events need root). The shell prints its own PID and then
     exec's perf, so the first stdout line is perf's real PID: with sudo's `use_pty` there is
@@ -41,6 +44,8 @@ def perf_stat_cmd(pid: int, events: str, interval_ms: int = 0) -> list[str]:
     perf = ["env", "LC_ALL=C", "perf", "stat", "-x,", "-e", events, "-p", str(pid)]
     if interval_ms:   # one line per event per interval, first field the seconds since perf started
         perf[4:4] = ["-I", str(interval_ms)]
+    if no_inherit:
+        perf[4:4] = ["--no-inherit"]
     return root_prefix() + ["sh", "-c", 'echo $$; exec "$@"', "sh"] + perf
 
 
@@ -64,13 +69,14 @@ class Monitors:
     """
 
     def __init__(self, out_dir: Path, device: str, pid: int | None = None, interval: int = 1,
-                 perf_events: str | None = None, perf_interval_ms: int = 0, perf_record_hz: int = 0):
+                 perf_events: str | None = None, perf_interval_ms: int = 0, perf_record_hz: int = 0,
+                 perf_no_inherit: bool = False):
         self.out_dir = Path(out_dir)
         self.cmds = {"iostat": iostat_cmd(device, interval), "mpstat": mpstat_cmd(interval)}
         if pid is not None:
             self.cmds["pidstat"] = pidstat_cmd(pid, interval)
             if perf_events:
-                self.cmds["perf"] = perf_stat_cmd(pid, perf_events, perf_interval_ms)
+                self.cmds["perf"] = perf_stat_cmd(pid, perf_events, perf_interval_ms, perf_no_inherit)
             if perf_record_hz:
                 self.cmds["perf_record"] = perf_record_cmd(pid, self.out_dir / "perf.data", perf_record_hz)
         self.procs: list[subprocess.Popen] = []
