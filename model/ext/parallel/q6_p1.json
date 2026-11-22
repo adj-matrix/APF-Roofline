@@ -1,0 +1,98 @@
+{
+ "query": "q6",
+ "sf": 100,
+ "source": "results/bench/20261122-174727_parallel_m1 (replica_par, 450k work per read, cold, buffered)",
+ "rule": "T(n workers) = table MiB / replica MiB/s at P = n + 1 + W_start (1.4 s); clock = replica's",
+ "cells": [
+  {
+   "io_method": "sync",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 155.1,
+   "MiBps": 572.0,
+   "clock_ghz": 2.474,
+   "busy_cpus": 1.26
+  },
+  {
+   "io_method": "sync",
+   "workers": 2,
+   "participants": 3,
+   "time_s": 134.3,
+   "MiBps": 661.4,
+   "clock_ghz": 2.268,
+   "busy_cpus": 1.59
+  },
+  {
+   "io_method": "sync",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 107.0,
+   "MiBps": 833.0,
+   "clock_ghz": 2.243,
+   "busy_cpus": 2.03
+  },
+  {
+   "io_method": "sync",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 94.0,
+   "MiBps": 949.9,
+   "clock_ghz": 2.043,
+   "busy_cpus": 2.56
+  },
+  {
+   "io_method": "sync",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 85.9,
+   "MiBps": 1040.9,
+   "clock_ghz": 2.005,
+   "busy_cpus": 2.96
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 138.3,
+   "MiBps": 642.5,
+   "clock_ghz": 2.201,
+   "busy_cpus": 1.78
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 2,
+   "participants": 3,
+   "time_s": 108.3,
+   "MiBps": 822.9,
+   "clock_ghz": 2.227,
+   "busy_cpus": 2.34
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 98.4,
+   "MiBps": 906.3,
+   "clock_ghz": 2.347,
+   "busy_cpus": 2.6
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 93.5,
+   "MiBps": 954.9,
+   "clock_ghz": 2.526,
+   "busy_cpus": 2.66
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 90.9,
+   "MiBps": 982.7,
+   "clock_ghz": 2.486,
+   "busy_cpus": 2.79
+  }
+ ]
+}

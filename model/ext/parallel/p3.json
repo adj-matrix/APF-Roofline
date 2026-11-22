@@ -1,0 +1,140 @@
+{
+ "note": "E2 P3, registered before the run. Q1 at P = 8 (n = 7) carries the unexplained ~6 % of P2 (hyperthread candidate, deferred): expect the measurement ~6 % above these at n = 7.",
+ "cells": [
+  {
+   "query": "q6",
+   "io_method": "sync",
+   "io_direct": "data",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 159.5,
+   "rule": "M4 par:psync:1:2:450:60: 556.0 MiB/s"
+  },
+  {
+   "query": "q6",
+   "io_method": "sync",
+   "io_direct": "data",
+   "workers": 2,
+   "participants": 3,
+   "time_s": 138.3,
+   "rule": "M4 par:psync:1:3:450:60: 642.2 MiB/s"
+  },
+  {
+   "query": "q6",
+   "io_method": "sync",
+   "io_direct": "data",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 111.4,
+   "rule": "M4 par:psync:1:4:450:60: 799.5 MiB/s"
+  },
+  {
+   "query": "q1",
+   "io_method": "sync",
+   "io_direct": "data",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 144.7,
+   "rule": "M4 par:psync:1:6:3000:60: 603.0 MiB/s x scale 0.9827"
+  },
+  {
+   "query": "q1",
+   "io_method": "sync",
+   "io_direct": "data",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 116.4,
+   "rule": "M4 par:psync:1:8:3000:60: 751.4 MiB/s x scale 0.9828"
+  },
+  {
+   "query": "q6",
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 141.3,
+   "rule": "M4 par:uring:1:2:450:60: 628.5 MiB/s"
+  },
+  {
+   "query": "q6",
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "workers": 2,
+   "participants": 3,
+   "time_s": 114.8,
+   "rule": "M4 par:uring:1:3:450:60: 775.7 MiB/s"
+  },
+  {
+   "query": "q6",
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 115.5,
+   "rule": "M4 par:uring:1:4:450:60: 770.7 MiB/s"
+  },
+  {
+   "query": "q1",
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 124.2,
+   "rule": "M4 par:uring:1:6:3000:60: 703.7 MiB/s x scale 0.9827"
+  },
+  {
+   "query": "q1",
+   "io_method": "io_uring",
+   "io_direct": "data",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 93.9,
+   "rule": "M4 par:uring:1:8:3000:60: 934.6 MiB/s x scale 0.9827"
+  },
+  {
+   "query": "q6",
+   "io_method": "worker",
+   "io_direct": "off",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 155.1,
+   "rule": "device: M1 psync buffered at the same P (572.0 MiB/s); the participants' CPU is not the limit"
+  },
+  {
+   "query": "q6",
+   "io_method": "worker",
+   "io_direct": "off",
+   "workers": 2,
+   "participants": 3,
+   "time_s": 134.3,
+   "rule": "device: M1 psync buffered at the same P (661.4 MiB/s); the participants' CPU is not the limit"
+  },
+  {
+   "query": "q6",
+   "io_method": "worker",
+   "io_direct": "off",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 107.0,
+   "rule": "device: M1 psync buffered at the same P (833.0 MiB/s); the participants' CPU is not the limit"
+  },
+  {
+   "query": "q1",
+   "io_method": "worker",
+   "io_direct": "off",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 129.1,
+   "rule": "P2's sync n=5 (138.2) x participant work 3078k / replica sync work 3399k (0.9056) x clock 3.197 (6 busy cores) / 3.10 (7-8 busy with the I/O workers)"
+  },
+  {
+   "query": "q1",
+   "io_method": "worker",
+   "io_direct": "off",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 97.5,
+   "rule": "8 cores shared by 8 participants and the I/O workers: CPU 703420 x (3078k / 3.1 GHz + 100 us I/O worker) / 8 = 96.1 s vs device 84.5 s; range 89-97 s if the I/O workers run nearly free on hyperthread siblings"
+  }
+ ]
+}

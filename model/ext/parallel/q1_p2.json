@@ -1,0 +1,113 @@
+{
+ "query": "q1",
+ "sf": 100,
+ "source": "results/bench/20261122-174727_parallel_m1 (replica_par, 3000k work per read, 90 s, cold, buffered)",
+ "rule": "T(n) = table MiB / replica MiB/s at P = n + 1, scaled by Q1's user cycles per read over the replica's at P = 2 of the same engine (the growth of the replica's user cycles with P, cache contention, is kept): (U/n + k_rep(P)) / (u_rep(2) + k_rep(P)); + W_start",
+ "U_per_read": 3103087.477248208,
+ "cells": [
+  {
+   "io_method": "sync",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 378.7,
+   "replica_MiBps": 229.2,
+   "scale": 0.9836,
+   "u_rep": 3158839,
+   "u_rep_P2": 3158839,
+   "k_rep": 240366,
+   "clock_ghz": 3.205,
+   "busy_cpus": 1.96
+  },
+  {
+   "io_method": "sync",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 201.1,
+   "replica_MiBps": 433.0,
+   "scale": 0.9836,
+   "u_rep": 3156704,
+   "u_rep_P2": 3158839,
+   "k_rep": 237269,
+   "clock_ghz": 3.205,
+   "busy_cpus": 3.68
+  },
+  {
+   "io_method": "sync",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 138.2,
+   "replica_MiBps": 632.4,
+   "scale": 0.9836,
+   "u_rep": 3160040,
+   "u_rep_P2": 3158839,
+   "k_rep": 240414,
+   "clock_ghz": 3.197,
+   "busy_cpus": 5.4
+  },
+  {
+   "io_method": "sync",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 107.2,
+   "replica_MiBps": 817.4,
+   "scale": 0.9835,
+   "u_rep": 3174015,
+   "u_rep_P2": 3158839,
+   "k_rep": 229439,
+   "clock_ghz": 3.113,
+   "busy_cpus": 7.16
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 1,
+   "participants": 2,
+   "time_s": 348.9,
+   "replica_MiBps": 248.6,
+   "scale": 0.9826,
+   "u_rep": 3162715,
+   "u_rep_P2": 3162715,
+   "k_rep": 262725,
+   "clock_ghz": 3.201,
+   "busy_cpus": 2.14
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 3,
+   "participants": 4,
+   "time_s": 181.6,
+   "replica_MiBps": 479.6,
+   "scale": 0.9827,
+   "u_rep": 3172802,
+   "u_rep_P2": 3162715,
+   "k_rep": 293868,
+   "clock_ghz": 3.109,
+   "busy_cpus": 4.29
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 5,
+   "participants": 6,
+   "time_s": 125.7,
+   "replica_MiBps": 695.2,
+   "scale": 0.9828,
+   "u_rep": 3207392,
+   "u_rep_P2": 3162715,
+   "k_rep": 308800,
+   "clock_ghz": 3.101,
+   "busy_cpus": 6.32
+  },
+  {
+   "io_method": "io_uring",
+   "workers": 7,
+   "participants": 8,
+   "time_s": 96.3,
+   "replica_MiBps": 910.7,
+   "scale": 0.9829,
+   "u_rep": 3319100,
+   "u_rep_P2": 3162715,
+   "k_rep": 329354,
+   "clock_ghz": 3.1,
+   "busy_cpus": 8.6
+  }
+ ]
+}
