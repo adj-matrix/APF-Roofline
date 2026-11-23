@@ -24,7 +24,7 @@ from pathlib import Path
 from ...model import cost
 from ...model.cost import MiB, extents_per_file
 from ...model.evaluate import predict_condition
-from ...model.params import ParamSet, interp
+from ...model.params import ParamSet
 
 K_TAIL = 0.83
 M3_TAIL_S, BURST_RATIO = 11.4, 2.11 / 1.52

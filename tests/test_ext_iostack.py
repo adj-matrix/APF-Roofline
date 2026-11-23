@@ -15,3 +15,15 @@ def test_fixed_point_slower_clock_lengthens_cpu_and_raises_share():
     assert abs(d - cpu / (cpu + 50.0)) < 1e-6
     assert 1.0 < f < 3.0
     assert abs(f - (1.0 + (d - 0.5) * 4.0)) < 1e-4
+
+
+def test_scan_family_points_and_off_cpu_time():
+    # model v3: one point per TPC-H-free scan (medians over its runs), off-CPU time per read from wall and cycles
+    from tpch.ext.iostack.model_v3 import family
+    row = lambda u, wall: {"u": u, "k": 10e3, "f": 2e9, "wall": wall, "n": 1000.0}
+    scans = {"lineitem_mid": [row(900e3, 2.0), row(900e3, 2.2)], "lineitem_min": [row(300e3, 1.0)]}
+    pts = family(scans, start=0.5)
+    assert [p["scan"] for p in pts] == ["lineitem_min", "lineitem_mid"]          # sorted by user cycles per read
+    assert pts[1]["runs"] == 2 and abs(pts[1]["wall"] - 2.1) < 1e-12              # median of the runs
+    # off per read = (wall - start) / n - (u + k) / f
+    assert abs(pts[0]["off"] - ((1.0 - 0.5) / 1000 - 310e3 / 2e9)) < 1e-15

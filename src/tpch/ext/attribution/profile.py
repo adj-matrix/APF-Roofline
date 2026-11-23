@@ -83,10 +83,12 @@ def report(data: Path, comm: str = "postgres") -> str:
                           "--sort", "dso,sym", "--percent-limit", "0"], capture_output=True, text=True, check=True).stdout
 
 
-def read(data: Path | None = None, comm: str = "postgres", text: str | None = None) -> dict:
-    """{event: {(dso, symbol): samples}} for one comm, unresolved postgres addresses resolved."""
+def read(data: Path | None = None, comm: str = "postgres", text: str | None = None,
+         symbols: "Symbols | None" = None) -> dict:
+    """{event: {(dso, symbol): samples}} for one comm, unresolved postgres addresses resolved (with `symbols`,
+    or PostgreSQL's table in results/tools, loaded only when an address needs it)."""
     out = text if text is not None else report(data, comm)
-    syms = Symbols()
+    syms = symbols
     events: dict = {}
     cur = None
     for line in out.splitlines():
@@ -101,6 +103,7 @@ def read(data: Path | None = None, comm: str = "postgres", text: str | None = No
             continue
         n, dso, sym = int(m.group(1)), m.group(2), m.group(3)
         if dso == "postgres" and sym.startswith("0x"):
+            syms = syms or Symbols()
             sym = syms.at(int(sym, 16))
         cur[(dso, sym)] += n
     return events
