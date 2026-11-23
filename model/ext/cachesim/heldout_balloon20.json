@@ -1,0 +1,34 @@
+{
+ "condition": "q3 x SF100, work_mem 64MB, cold; balloon pinned on node 0",
+ "model": "src/tpch/ext/cachesim/model.py (K_TAIL 0.83, BURST_RATIO 1.39 from M3)",
+ "cells": {
+  "pinned_0": {
+   "capacity_MiB": 31031.24609375,
+   "turnover_MiBps": 476.3162762813357,
+   "t_tail_s": 54.07317687922087,
+   "burst_scale": 1.0,
+   "time_s": 351.2498036503306,
+   "temp_dev_MiB": 10591.37598114909,
+   "phase3_extents": 419.0397067009453,
+   "W_jump_s": 10.298043269892126,
+   "W_burst_s": 12.498115563634968,
+   "phase12_s": 263.39866171690574,
+   "phase3_s": 87.85114193342483,
+   "cpu_s": 323.7760668349915
+  },
+  "pinned_20": {
+   "capacity_MiB": 10551.24609375,
+   "turnover_MiBps": 475.16859518580037,
+   "t_tail_s": 18.43037260151448,
+   "burst_scale": 1.2414431297788078,
+   "time_s": 371.4309529274553,
+   "temp_dev_MiB": 12988.289097530924,
+   "phase3_extents": 851.6175197823925,
+   "W_jump_s": 20.928790107177466,
+   "W_burst_s": 15.515699701656224,
+   "phase12_s": 268.3744204132095,
+   "phase3_s": 103.05653251424575,
+   "cpu_s": 330.29134514437374
+  }
+ }
+}

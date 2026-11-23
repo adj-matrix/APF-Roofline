@@ -1,0 +1,19 @@
+{
+ "condition": "q3 x SF100, work_mem 64MB, cold, with a 24 GiB mlocked balloon on node 0",
+ "capacity_MiB": 31031.24609375,
+ "balloon_GiB": 24,
+ "cells": {
+  "no balloon": {
+   "window_MiB": 31031.24609375,
+   "time_s": 351.2498036503306,
+   "temp_dev_MiB": 10591.37598114909,
+   "clock_ghz": 3.3129717060430375
+  },
+  "balloon 24 GiB": {
+   "window_MiB": 6455.24609375,
+   "time_s": 355.0906372537746,
+   "temp_dev_MiB": 13467.671720807293,
+   "clock_ghz": 3.3131809113604445
+  }
+ }
+}

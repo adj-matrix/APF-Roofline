@@ -21,3 +21,7 @@ SELECT count(l_quantity) FROM lineitem;
 -- name: lineitem_mid
 -- as lineitem_light with more work per tuple: numeric arithmetic on two columns (E1 fix M10, the high point)
 SELECT sum(l_extendedprice * (1 - l_discount)) FROM lineitem;
+-- name: customer_light
+-- one Seq Scan of customer, ~nothing per tuple (41.7 tuples per page at SF100, against lineitem's 53.3): E3 A2,
+-- per-page vs per-tuple components on another table. count(c_comment): not answerable from an index.
+SELECT count(c_comment) FROM customer;
