@@ -1,0 +1,116 @@
+{
+ "a1": {
+  "q6_n0": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 135.36610167089842,
+    "tuple work: deforming, expressions": 252.59240647852585,
+    "aggregation, executor, other": 62.09610713069568
+   },
+   "bufmgr_share": 0.07511529471223703,
+   "kcycles_per_read": 450.05461528011995,
+   "kinstr_per_read": 957.7414691838296
+  },
+  "q6_n1": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 138.72101868097238,
+    "tuple work: deforming, expressions": 261.8895886596509,
+    "aggregation, executor, other": 63.204924068006044
+   },
+   "bufmgr_share": 0.07907803592227058,
+   "kcycles_per_read": 463.8155314086293,
+   "kinstr_per_read": 957.8261277566298
+  },
+  "q6_n3": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 143.66823909310682,
+    "tuple work: deforming, expressions": 260.2120966119362,
+    "aggregation, executor, other": 63.34708820491628
+   },
+   "bufmgr_share": 0.08227347410697985,
+   "kcycles_per_read": 467.22742390995927,
+   "kinstr_per_read": 957.826170308447
+  },
+  "q6_n7": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 151.6293004621976,
+    "tuple work: deforming, expressions": 269.99284402569435,
+    "aggregation, executor, other": 69.28944407019979
+   },
+   "bufmgr_share": 0.08704969303834124,
+   "kcycles_per_read": 490.9115885580918,
+   "kinstr_per_read": 957.7126114323389
+  },
+  "q1_n0": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 141.1944500623954,
+    "tuple work: deforming, expressions": 2288.680719336001,
+    "aggregation, executor, other": 753.852124235673
+   },
+   "bufmgr_share": 0.011618561120240052,
+   "kcycles_per_read": 3183.727293634069,
+   "kinstr_per_read": 6702.841162567376
+  },
+  "q1_n1": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 149.52504006783215,
+    "tuple work: deforming, expressions": 2242.363821074295,
+    "aggregation, executor, other": 741.9956209641027
+   },
+   "bufmgr_share": 0.01240213022690364,
+   "kcycles_per_read": 3133.8844821062303,
+   "kinstr_per_read": 6670.909398348568
+  },
+  "q1_n3": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 145.2317749888737,
+    "tuple work: deforming, expressions": 2312.108054443071,
+    "aggregation, executor, other": 747.2271492722374
+   },
+   "bufmgr_share": 0.01270528529221269,
+   "kcycles_per_read": 3204.5669787041825,
+   "kinstr_per_read": 6707.47323206738
+  },
+  "q1_n7": {
+   "groups_kcycles_per_read": {
+    "per-page floor: verification, buffer manager, heap page": 150.15056222826132,
+    "tuple work: deforming, expressions": 2271.734505214558,
+    "aggregation, executor, other": 750.155734487871
+   },
+   "bufmgr_share": 0.014287635010980146,
+   "kcycles_per_read": 3172.0408019306897,
+   "kinstr_per_read": 6709.606244650346
+  }
+ },
+ "a2": {
+  "Q6": {
+   "tuples_per_page": 53.3,
+   "checksum": 57.59251117648462,
+   "bufmgr": 45.466125899642854,
+   "heap_page": 45.542893168687336
+  },
+  "Q1": {
+   "tuples_per_page": 53.3,
+   "checksum": 57.609463077933306,
+   "bufmgr": 49.27027863377289,
+   "heap_page": 47.271490135905594
+  },
+  "lineitem_min": {
+   "tuples_per_page": 53.3,
+   "checksum": 58.030464320318586,
+   "bufmgr": 44.89755326223178,
+   "heap_page": 46.703008668571925
+  },
+  "orders": {
+   "tuples_per_page": 57.4,
+   "checksum": 58.30797162909937,
+   "bufmgr": 43.81976947887367,
+   "heap_page": 49.64934194168637
+  },
+  "customer": {
+   "tuples_per_page": 41.7,
+   "checksum": 69.87823535466211,
+   "bufmgr": 48.2471382958304,
+   "heap_page": 33.292305761329466
+  }
+ }
+}
