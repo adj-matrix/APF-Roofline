@@ -1,12 +1,12 @@
 """Q6 × SF1 (with SF10 in the same experiments): does the SF10 model scale down to SF1?
 
-    ./tpch report q6/sf1 --cond first=scale --cond main=scale3 [--cond repro=scale2]
+    queries/q6/sf1/report.sh        (the results it reads are listed there)
 
 `first` is the experiment before device-cache eviction existed (its SF1 cold runs hit the RAID
 controller cache); `main` is the experiment used for the prediction check; `repro` (optional)
 is an earlier experiment of the same design, compared number by number with `main`.
 The bandwidth at each table's location comes from the device characterization (hardware/,
-`./tpch bench location`): the newest scan made with controller-cache eviction.
+`./tpch bench location`): --input scan=<bench run>.
 Writes fig1_cache.png .. fig3_cycles.png and numbers.json into this directory.
 """
 from __future__ import annotations
@@ -27,7 +27,6 @@ from queries.q6.model import predict_q6
 TUPLES = {1: 6_001_215, 10: 59_986_052}          # exact count(*) of lineitem
 PAGES = {1: 112_555, 10: 1_124_956}               # after VACUUM FULL
 FILES = {1: "16384/16632", 10: "16506/16628"}     # relfilenode paths under base/ (location scan)
-SCAN = "20261111-184649_location"                 # first location scan with controller-cache eviction
 SF_COLOR = {10: style.SERIES[0], 1: style.SERIES[1]}
 EARLY_COLOR = style.SERIES[2]                      # SF1 runs before device-cache eviction
 
@@ -36,14 +35,9 @@ def _stats(xs: list[float]) -> dict:
     return data.stats(xs)
 
 
-def _experiment_runs(cfg: Config, label: str) -> list[dict]:
-    return data.experiment_runs(cfg, "q6", label)
-
-
-def _table_bandwidth(cfg: Config) -> tuple[str, dict[int, float]]:
-    """MiB/s at each lineitem's own location, from the location scan this report used (pinned:
-    later scans would shift the numbers by < 1 % and break the report's tables)."""
-    path = next(p for p in location.scans(cfg) if p.parent.name == SCAN)
+def _table_bandwidth(cfg: Config, scan: str) -> tuple[str, dict[int, float]]:
+    """MiB/s at each lineitem's own location, from the given location scan."""
+    path = next(p for p in location.scans(cfg) if p.parent.name == scan)
     rows = location.load_scan(path)
     return path.parent.name, {sf: location.table_bandwidth(rows, f) for sf, f in FILES.items()}
 
@@ -74,8 +68,8 @@ def _cells(runs: list[dict], hw1: HwParams, loc_bw: dict[int, float]) -> tuple[d
                 "wall_s": _stats(walls),
                 "pred_v1_s": p1.total_s, "pred_v1_range_s": [p1.lower_s, p1.upper_s],
                 "pred_v2_s": _stats(p2),
-                "err_v1": _stats([w / p1.total_s - 1 for w in walls]),
-                "err_v2": _stats([w / p - 1 for w, p in zip(walls, p2)]),
+                "err_v1": _stats([p1.total_s / w - 1 for w in walls]),
+                "err_v2": _stats([p / w - 1 for w, p in zip(walls, p2)]),
                 "dev_MiBps": _stats([r["dev_avg_read_MiBps"] for r in rs]) if c == "cold" else {},
                 "dev_r_await_ms": _stats([r.get("dev_avg_r_await_ms") for r in rs]) if c == "cold" else {},
                 "GHz": _stats([r["perf_GHz"] for r in rs]),
@@ -86,13 +80,13 @@ def _cells(runs: list[dict], hw1: HwParams, loc_bw: dict[int, float]) -> tuple[d
     return cells, cpt10
 
 
-def collect(cfg: Config, conds: dict[str, str]) -> dict:
+def collect(cfg: Config, conds: dict[str, str], scan_run: str) -> dict:
     sf10 = json.loads((cfg.repo / "queries/q6/sf10/numbers.json").read_text())
     hw1 = HwParams(seq_read_MiBps=sf10["fio_seq_buffered_8k_MiBps"]["median"],
                    cpu_ns_per_tuple=sf10["conditions"]["B2"]["cpu_ns_per_tuple"])
-    scan, loc_bw = _table_bandwidth(cfg)
+    scan, loc_bw = _table_bandwidth(cfg, scan_run)
 
-    runs = {name: _experiment_runs(cfg, label) for name, label in conds.items()}
+    runs = {name: data.experiment_runs(cfg, ids.split(",")) for name, ids in conds.items()}
     main = runs["main"]
     cells, cpt10 = _cells(main, hw1, loc_bw)
     an = {f"sf{r['sf']}_{r['cache']}": {"exec_s": r["exec_ms"] / 1000, "io_read_s": r["io_read_ms"] / 1000}
@@ -168,11 +162,12 @@ def fig_prediction(nums: dict, out: Path) -> None:
     ax.axvline(0, color=style.INK_2, linewidth=0.8)
     ax.set_yticks(range(len(rows)), [r[1] for r in rows])
     ax.set_ylim(len(rows) - 0.5, -0.85)          # inverted; room above the first row for the label
-    ax.text(0.6, -0.62, "0 = measured equals predicted   (right: slower than predicted)",
+    ax.text(0.6, -0.62, "0 = predicted equals measured   (right: predicted too slow)",
             fontsize=8.5, color=style.INK_2, va="center")
     hi = max(nums["cells"][k][e]["max"] for k, _ in rows for e in ("err_v1", "err_v2")) * 100
-    ax.set_xlim(-10, hi + 12)
-    ax.set_xlabel("measured / predicted − 1 (%)   dot = median of 5 runs, line = min–max")
+    lo = min(nums["cells"][k][e]["min"] for k, _ in rows for e in ("err_v1", "err_v2")) * 100
+    ax.set_xlim(min(-10, lo - 5), max(14, hi + 12))
+    ax.set_xlabel("predicted / measured − 1 (%)   dot = median of 5 runs, line = min–max")
     ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=1, borderaxespad=0.2)
     ax.set_title("SF10 parameters predict SF1 once location and clock are accounted for", pad=48)
     style.save(fig, out / "fig2_prediction.png")
@@ -210,12 +205,14 @@ def fig_cycles(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig3_cycles.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
     assert {"first", "main"} <= set(conds) <= {"first", "main", "repro"}, \
-        "use --cond first=<label> --cond main=<label> [--cond repro=<label>]"
+        "use --cond first=<experiments> --cond main=<experiments> [--cond repro=<experiments>]"
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg, conds)
+    ((scan,),) = data.need(inputs, "scan")
+    nums = collect(cfg, conds, scan)
     fig_cache(nums, out)
     fig_prediction(nums, out)
     fig_cycles(nums, out)

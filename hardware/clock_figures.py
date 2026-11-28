@@ -1,9 +1,9 @@
 """Figures for the clock microbenchmarks (docs/7 Parts A-D, docs/8 M1) and the clock of long runs.
 
-    .venv/bin/python -m hardware.clock_figures
+    hardware/report.sh        (the results it reads are listed there)
 
-Reads every results/bench/*_clock_state, *_clock_m1 and *_clock_m1b run (cells.jsonl), the query runs of the
-registered datasets, model/params.json (the fitted curves) and the turbostat log of Q1 x SF1000.
+Reads the --input clock benches (cells.jsonl) and long runs, the query runs of the registered datasets,
+model/params.json (the fitted curves) and the turbostat log of Q1 x SF1000.
 Writes into hardware/:
   fig3_clock_vs_oncpu.png   clock vs the worker's on-CPU share, by idle length; queries and fitted curves on top
   fig4_clock_vs_idle.png    clock vs the length of each idle, one line per on-CPU share
@@ -12,6 +12,7 @@ Writes into hardware/:
 """
 from __future__ import annotations
 
+import argparse
 import json
 import statistics as st
 import sys
@@ -27,24 +28,23 @@ import matplotlib.pyplot as plt  # noqa: E402
 from tpch.config import load as load_cfg  # noqa: E402
 from tpch.model import data  # noqa: E402
 from tpch.report import style  # noqa: E402
+from tpch.report.data import need  # noqa: E402
 
 OUT = ROOT / "hardware"
 BLUE, ORANGE, AQUA = style.SERIES
 RAMP = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]       # ordinal blue ramp, steps 250 / 400 / 550 / 700
 SHORT_MS, LONG_MS = 3.5, 8.0                               # idle classes (M1: the step lies between 3 and ~9 ms)
-TURBOSTAT = ROOT / "results/jobs/20261119-152028_q1-sf1000_turbostat.txt"
 
 
-def cells() -> list[dict]:
+def cells(benches: list[str]) -> list[dict]:
     out = []
-    for kind in ("clock_state", "clock_m1", "clock_m1b"):
-        for f in sorted((ROOT / "results/bench").glob(f"*_{kind}/cells.jsonl")):
-            for line in f.read_text().splitlines():
-                r = json.loads(line)
-                r["run"] = f.parent.name
-                if r["load"].startswith("sleep:") and "idle_ms_mean" not in r:
-                    r["idle_ms_mean"] = 0.3 + 0.07                 # docs/7 cells: 0.3 ms sleeps (+ timer slack)
-                out.append(r)
+    for bench in benches:
+        for line in (ROOT / "results/bench" / bench / "cells.jsonl").read_text().splitlines():
+            r = json.loads(line)
+            r["run"] = bench
+            if r["load"].startswith("sleep:") and "idle_ms_mean" not in r:
+                r["idle_ms_mean"] = 0.3 + 0.07                 # docs/7 cells: 0.3 ms sleeps (+ timer slack)
+            out.append(r)
     return out
 
 
@@ -71,7 +71,7 @@ def fitted_curves() -> dict:
     return {"scan phase": p["clock_GHz_vs_on_cpu"], "read-back phase": p["clock_readback_GHz_vs_on_cpu"]}
 
 
-def fig_oncpu(cs: list[dict], qs, curves) -> None:
+def fig_oncpu(cs: list[dict], qs, curves, out: Path) -> None:
     fig, (ax, zx) = plt.subplots(1, 2, figsize=(9.6, 4.6), gridspec_kw={"width_ratios": [1.6, 1]})
     for a in (ax, zx):
         for cls, color, label in (("short", BLUE, f"idle < {SHORT_MS:g} ms each (sleep)"),
@@ -103,10 +103,10 @@ def fig_oncpu(cs: list[dict], qs, curves) -> None:
     zx.set_title("queries (diamonds) vs microbenchmark", fontsize=9, fontweight="normal")
     fig.suptitle("At the same on-CPU share, many short idles cost far more clock than a few long ones",
                  x=0.01, ha="left", fontsize=11, fontweight="bold")
-    style.save(fig, OUT / "fig3_clock_vs_oncpu.png")
+    style.save(fig, out / "fig3_clock_vs_oncpu.png")
 
 
-def fig_idle(cs: list[dict]) -> None:
+def fig_idle(cs: list[dict], out: Path) -> None:
     by = defaultdict(list)
     for r in cs:
         if r["run"].endswith(("clock_m1", "clock_m1b")) and r["load"].startswith("sleep:") and r["load"].count(":") == 2:
@@ -140,10 +140,10 @@ def fig_idle(cs: list[dict]) -> None:
     ax.set_title("The clock depends on how long each idle lasts, not on what the task waits for")
     ax.set_ylim(1.0, 3.65)
     ax.legend(loc="center left", bbox_to_anchor=(0.0, 0.33))
-    style.save(fig, OUT / "fig4_clock_vs_idle.png")
+    style.save(fig, out / "fig4_clock_vs_idle.png")
 
 
-def fig_causes(cs: list[dict]) -> None:
+def fig_causes(cs: list[dict], out: Path) -> None:
     groups = [("reference", [("spin", "busy loop, nothing else")]),
               ("other cores awake", [("spin+wakers:1", "+ 1 core waking every 1 ms"),
                                      ("spin+wakers:3", "+ 3 cores"), ("spin+wakers:7", "+ 7 cores")]),
@@ -175,7 +175,7 @@ def fig_causes(cs: list[dict]) -> None:
     ax.set_title("A task that never sleeps loses clock when other cores wake; memory stalls do not matter")
     handles = [plt.Line2D([], [], marker="o", linestyle="", color=c, markersize=7) for c in colors.values()]
     ax.legend(handles, colors.keys(), loc="upper center", bbox_to_anchor=(0.45, -0.13), ncol=4)
-    style.save(fig, OUT / "fig5_clock_causes.png")
+    style.save(fig, out / "fig5_clock_causes.png")
 
 
 def _turbostat_intervals(path: Path):
@@ -203,15 +203,14 @@ def _turbostat_intervals(path: Path):
         yield float(b[0][ix["Time_Of_Day_Seconds"]]), mhz, stayed
 
 
-def fig_long_run() -> None:
-    runs = {"SF1000": "20261119-152046_q1_sf1000_plain_cold_blind_r0", "SF100": "20261119-171918_q1_sf100_plain_cold_blind_r0"}
+def fig_long_run(runs: dict[str, str], turbostat: Path, out: Path) -> None:
     spans = {}
     for k, d in runs.items():
         meta = json.loads((ROOT / "results/runs" / d / "meta.json").read_text())
         s = json.loads((ROOT / "results/runs" / d / "summary.json").read_text())
         t0 = time.mktime(time.strptime(d[:15], "%Y%m%d-%H%M%S"))
         spans[k] = (t0 + 10, t0 + s["wall_s"] - 10, s["perf_GHz"])
-    iv = list(_turbostat_intervals(TURBOSTAT))
+    iv = list(_turbostat_intervals(turbostat))
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.6), sharey=True, gridspec_kw={"width_ratios": [2, 1]})
     for ax, (k, (lo, hi, perf)) in zip(axes, spans.items()):
         sel = [x for x in iv if lo <= x[0] < hi]
@@ -232,18 +231,28 @@ def fig_long_run() -> None:
     axes[0].set_ylabel("busy-weighted clock (GHz, turbostat)")
     fig.suptitle("Long runs change core more often, and those intervals run ~3 % slower", x=0.02, ha="left",
                  fontsize=11, fontweight="bold", y=1.04)
-    style.save(fig, OUT / "fig6_long_run_clock.png")
+    style.save(fig, out / "fig6_long_run_clock.png")
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description="clock figures")
+    ap.add_argument("--input", action="append", default=[], metavar="NAME=VALUE[,VALUE...]")
+    ap.add_argument("--out", type=Path, default=OUT)
+    a = ap.parse_args()
+    inputs: dict[str, list[str]] = {}
+    for item in a.input:
+        name, value = item.split("=", 1)
+        inputs.setdefault(name, []).extend(value.split(","))
+    benches, (turbostat,), (sf1000,), (sf100,) = need(inputs, "cells", "turbostat", "long_sf1000", "long_sf100")
     style.apply()
     cfg = load_cfg()
-    cs = cells()
-    fig_oncpu(cs, queries(cfg), fitted_curves())
-    fig_idle(cs)
-    fig_causes(cs)
-    fig_long_run()
-    print("figures ->", OUT)
+    a.out.mkdir(parents=True, exist_ok=True)
+    cs = cells(benches)
+    fig_oncpu(cs, queries(cfg), fitted_curves(), a.out)
+    fig_idle(cs, a.out)
+    fig_causes(cs, a.out)
+    fig_long_run({"SF1000": sf1000, "SF100": sf100}, ROOT / turbostat, a.out)
+    print("figures ->", a.out)
 
 
 if __name__ == "__main__":

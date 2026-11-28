@@ -1,9 +1,9 @@
 """Q3 × SF1 and SF10 (same experiments): predicted vs measured, and where the non-linearity is.
 
-    ./tpch report q3/sf10 --cond cal=cal --cond main=main
+    queries/q3/sf10/report.sh        (the results it reads are listed there)
 
 `cal` = the SF1 warm calibration runs (before the prediction's part B); `main` = the experiment.
-Device bandwidth and memory latency come from hardware/ (pinned to the runs docs/2-q3-prediction.md used).
+Device bandwidth and memory latency come from hardware/ (--input scan=, mem=).
 Writes fig1_prediction.png .. fig4_wait.png and numbers.json into this directory.
 """
 from __future__ import annotations
@@ -17,12 +17,10 @@ from tpch.bench import location, mem
 from tpch.config import Config
 from tpch.parse.plan import parse_plan
 from tpch.report import style
-from tpch.report.data import experiment_runs, stats
+from tpch.report.data import experiment_runs, need, stats
 
 from queries.q3.model import HashTable, io_seconds, probe_ns, probe_ns_split, warm_seconds_scaled
 
-SCAN = "20261112-000731_location"      # location scan with orders/customer (docs/2-q3-prediction.md)
-MEM = "20261112-000154_mem"            # memory-latency run (docs/2-q3-prediction.md)
 SF_COLOR = {10: style.SERIES[0], 1: style.SERIES[1]}
 PAGES = {(1, "customer"): 3600, (1, "orders"): 26136, (1, "lineitem"): 112555,
          (10, "customer"): 35932, (10, "orders"): 261196, (10, "lineitem"): 1124956}
@@ -40,8 +38,8 @@ PHASES = {"customer scan + hash": ("Seq Scan:customer", "Hash:1"), "orders scan 
     "probe outer hash": ("Hash Join:0",), "aggregate + sort": ("Aggregate", "Sort", "Limit")}
 
 
-def _bandwidth(cfg: Config) -> dict:
-    path = next(p for p in location.scans(cfg) if p.parent.name == SCAN)
+def _bandwidth(cfg: Config, scan: str) -> dict:
+    path = next(p for p in location.scans(cfg) if p.parent.name == scan)
     rows = location.load_scan(path)
     return {k: location.table_bandwidth(rows, f) for k, f in FILES.items()}
 
@@ -86,11 +84,11 @@ def _phases(cfg: Config, run: str) -> dict[str, dict]:
     return out
 
 
-def collect(cfg: Config, conds: dict[str, str]) -> dict:
-    cal = experiment_runs(cfg, "q3", conds["cal"])
-    main = experiment_runs(cfg, "q3", conds["main"])
-    bw = _bandwidth(cfg)
-    curve = mem.latency_curve(cfg.repo / cfg.RESULTS_DIR / "bench" / MEM / "mem.csv")
+def collect(cfg: Config, conds: dict[str, str], scan: str, mem_run: str) -> dict:
+    cal = experiment_runs(cfg, conds["cal"].split(","))
+    main = experiment_runs(cfg, conds["main"].split(","))
+    bw = _bandwidth(cfg, scan)
+    curve = mem.latency_curve(cfg.repo / cfg.RESULTS_DIR / "bench" / mem_run / "mem.csv")
     cal_warm = _sel(cal, 1, "warm")
     cal_cyc = stats(r["perf_cycles"] for r in cal_warm)["median"]
     cal_ghz = stats(r["perf_GHz"] for r in cal_warm)["median"]
@@ -114,13 +112,13 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
             }
             if c == "cold":
                 pred = sum(io.values())
-                cell.update(pred_io_by_table_s=io, pred_s=pred, err=stats(w / pred - 1 for w in walls),
+                cell.update(pred_io_by_table_s=io, pred_s=pred, err=stats(pred / w - 1 for w in walls),
                             dev_MiBps=stats(r["dev_avg_read_MiBps"] for r in rs),
                             dev_r_await_ms=stats(r.get("dev_avg_r_await_ms") for r in rs),
                             dev_read_MiB=stats(r["dev_read_MiB"] for r in rs))
             elif sf == 1:     # calibration check: cal cycles at each run's clock
                 p = [cal_cyc / (r["perf_GHz"] * 1e9) for r in rs]
-                cell.update(pred_s=stats(p), err=stats(w / q - 1 for w, q in zip(walls, p)))
+                cell.update(pred_s=stats(p), err=stats(q / w - 1 for w, q in zip(walls, p)))
             else:
                 for name, small, wait in (("linear", None, None), ("local", w1, w10["local"]),
                                           ("remote", w1, w10["remote"]), ("v2", w1_v2, w10_v2)):
@@ -129,7 +127,7 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
                     else:
                         p = [warm_seconds_scaled(cal_cyc, cal_ghz, small, SCALE, r["perf_GHz"], wait * 1e9) for r in rs]
                     cell[f"pred_{name}_s"] = stats(p)
-                    cell[f"err_{name}"] = stats(w / q - 1 for w, q in zip(walls, p))
+                    cell[f"err_{name}"] = stats(q / w - 1 for w, q in zip(walls, p))
             cells[f"sf{sf}_{c}"] = cell
 
     # Measured hash-table wait at SF10 warm: what is left after the linearly scaled compute part.
@@ -174,7 +172,7 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
             walk(top["Plan"])
             hash_actual[f"sf{r['sf']}"] = found
     return {
-        "labels": conds, "location_scan": SCAN, "mem_run": MEM,
+        "labels": conds, "location_scan": scan, "mem_run": mem_run,
         "bandwidth_MiBps": {f"sf{k[0]}_{k[1]}": v for k, v in bw.items()},
         "calibration": {"cycles": cal_cyc, "GHz": cal_ghz, "n": len(cal_warm), "wait_s_sf1": w1},
         "hash_tables_predicted": {f"sf{sf}": {"outer_MiB": OUTER[sf].bytes / 2**20, "inner_MiB": INNER[sf].bytes / 2**20}
@@ -207,12 +205,12 @@ def fig_prediction(nums: dict, out: Path) -> None:
     ax.axvline(0, color=style.INK_2, linewidth=0.8)
     ax.set_yticks(range(len(rows)), [r[0] for r in rows])
     ax.set_ylim(len(rows) - 0.5, -1.0)
-    ax.text(0.6, -0.75, "0 = measured equals predicted   (right: slower than predicted)", fontsize=8.5,
+    ax.text(0.6, -0.75, "0 = predicted equals measured   (right: predicted too slow)", fontsize=8.5,
             color=style.INK_2, va="center")
     lo = min(r[1]["min"] for r in rows) * 100
     hi = max(r[1]["max"] for r in rows) * 100
     ax.set_xlim(min(-10, lo - 5), hi + 12)
-    ax.set_xlabel("measured / predicted − 1 (%)   dot = median of 5 runs, line = min–max")
+    ax.set_xlabel("predicted / measured − 1 (%)   dot = median of 5 runs, line = min–max")
     ax.set_title("Q3: cold is the sum of three scans; SF10 warm needs the DRAM wait", pad=12)
     style.save(fig, out / "fig1_prediction.png")
 
@@ -305,12 +303,14 @@ def fig_wait(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig4_wait.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
-    assert {"cal", "main"} == set(conds), "use --cond cal=<label> --cond main=<label>"
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
+    assert {"cal", "main"} == set(conds), "use --cond cal=<experiments> --cond main=<experiments>"
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg, conds)
-    q6 = {sf: [r["perf_cycles"] / LINEITEM[sf] for r in experiment_runs(cfg, "q6", "scale3")
+    (scan,), (mem_run,), q6_ids = need(inputs, "scan", "mem", "q6")
+    nums = collect(cfg, conds, scan, mem_run)
+    q6 = {sf: [r["perf_cycles"] / LINEITEM[sf] for r in experiment_runs(cfg, q6_ids)
                if r["sf"] == sf and r["cache"] == "warm" and r["mode"] == "plain"] for sf in (1, 10)}
     nums["q6_warm_cycles_per_tuple"] = {sf: stats(v) for sf, v in q6.items()}
     fig_prediction(nums, out)

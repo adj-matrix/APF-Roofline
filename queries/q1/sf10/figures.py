@@ -1,6 +1,6 @@
 """Q1 × SF1 and SF10 (same experiments): CPU cost from its pieces, and the CPU-bound cold run.
 
-    ./tpch report q1/sf10 --cond micro=micro --cond main=main
+    queries/q1/sf10/report.sh        (the results it reads are listed there)
 
 `micro` = the piece microbenchmarks (queries/q1/micro.sql, SF1 warm), `main` = the experiment.
 Writes fig1_pieces.png .. fig4_queries.png and numbers.json into this directory.
@@ -16,9 +16,8 @@ import matplotlib.pyplot as plt
 from tpch.bench import location
 from tpch.config import Config
 from tpch.report import style
-from tpch.report.data import experiment_runs, stats
+from tpch.report.data import experiment_runs, need, stats
 
-SCAN = "20261112-000731_location"      # bandwidth used in docs/3-q1-prediction.md
 LINEITEM = {1: 6_001_215, 10: 59_986_052}
 MIB = {1: 112_555 * 8192 / 2**20, 10: 1_124_956 * 8192 / 2**20}
 FILES = {1: "16384/16632", 10: "16506/16628"}
@@ -36,15 +35,15 @@ def _cpt(r: dict) -> float:
     return r["perf_cycles"] / LINEITEM[r["sf"]]
 
 
-def collect(cfg: Config, conds: dict[str, str]) -> dict:
-    micro = experiment_runs(cfg, "q1", conds["micro"])
-    main = [r for r in experiment_runs(cfg, "q1", conds["main"]) if r["query"] == "q1"]
+def collect(cfg: Config, conds: dict[str, str], scan: str) -> dict:
+    micro = experiment_runs(cfg, conds["micro"].split(","))
+    main = [r for r in experiment_runs(cfg, conds["main"].split(",")) if r["query"] == "q1"]
     med = {q.split(".")[1]: stats(_cpt(r) for r in micro if r["query"] == q)["median"]
            for q in {r["query"] for r in micro}}
     pieces = [{"piece": lab, "cycles_per_tuple": n * (med[s] - (med[b] if b else 0))} for lab, s, b, n in PIECES]
     pred_cpt = sum(p["cycles_per_tuple"] for p in pieces)
     noshare_cpt = pred_cpt - 2 * (med["m_sum_avg_qty"] - med["m_sum_qty"]) + 2 * (med["m_avg_qty"] - med["m_group"])
-    rows = location.load_scan(next(p for p in location.scans(cfg) if p.parent.name == SCAN))
+    rows = location.load_scan(next(p for p in location.scans(cfg) if p.parent.name == scan))
     bw = {sf: location.table_bandwidth(rows, f) for sf, f in FILES.items()}
 
     cells = {}
@@ -58,8 +57,8 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
             walls = [r["wall_s"] for r in rs]
             cell = {"wall_s": stats(walls), "GHz": stats(r["perf_GHz"] for r in rs),
                     "cycles_per_tuple": stats(_cpt(r) for r in rs), "pred_cycles_per_tuple": cpt,
-                    "pred_s": stats(pred), "err": stats(w / p - 1 for w, p in zip(walls, pred)),
-                    "err_cycles": stats(_cpt(r) / cpt - 1 for r in rs),
+                    "pred_s": stats(pred), "err": stats(p / w - 1 for w, p in zip(walls, pred)),
+                    "err_cycles": stats(cpt / _cpt(r) - 1 for r in rs),
                     "perf_cpu_s": stats(r["perf_task_clock_s"] for r in rs),
                     "cpu_util": stats(r["perf_task_clock_s"] / r["wall_s"] for r in rs),
                     "ipc": stats(r["perf_ipc"] for r in rs)}
@@ -71,7 +70,7 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
             cells[f"sf{sf}_{c}"] = cell
     analyze = {f"sf{r['sf']}_{r['cache']}": {"wall_s": r["wall_s"], "run": r["run"]}
                for r in main if r["mode"] == "analyze"}
-    return {"labels": conds, "location_scan": SCAN, "bandwidth_MiBps": bw,
+    return {"labels": conds, "location_scan": scan, "bandwidth_MiBps": bw,
             "micro_cycles_per_tuple": med, "pieces": pieces, "pred_cycles_per_tuple": pred_cpt,
             "pred_cycles_per_tuple_without_sharing": noshare_cpt, "cells": cells, "analyze": analyze,
             "_main": main}
@@ -119,12 +118,12 @@ def fig_prediction(nums: dict, out: Path) -> None:
     ax.axvline(0, color=style.INK_2, linewidth=0.8)
     ax.set_yticks(range(len(rows)), [r[0] for r in rows])
     ax.set_ylim(len(rows) - 0.5, -1.0)
-    ax.text(0.3, -0.75, "0 = measured equals predicted   (right: slower than predicted)", fontsize=8.5,
+    ax.text(0.3, -0.75, "0 = predicted equals measured   (right: predicted too slow)", fontsize=8.5,
             color=style.INK_2, va="center")
     lo = min(r[1]["min"] for r in rows) * 100
     hi = max(r[1]["max"] for r in rows) * 100
     ax.set_xlim(min(-5, lo - 3), max(9, hi + 6))
-    ax.set_xlabel("measured / predicted − 1 (%)   prediction at each run's clock; dot = median, line = min–max")
+    ax.set_xlabel("predicted / measured − 1 (%)\nprediction at each run's clock; dot = median, line = min–max")
     ax.set_title("Pieces measured at SF1 predict Q1 at SF1 and SF10, warm and cold", pad=12)
     style.save(fig, out / "fig2_prediction.png")
 
@@ -148,14 +147,13 @@ def fig_cold(cfg: Config, nums: dict, out: Path) -> None:
     style.save(fig, out / "fig3_cold.png")
 
 
-def fig_queries(cfg: Config, nums: dict, out: Path) -> None:
-    sets = {"Q6": ("q6", "scale3"), "Q3": ("q3", "main"), "Q1": ("q1", "main")}
+def fig_queries(cfg: Config, nums: dict, out: Path, sets: dict[str, tuple[str, list[str]]]) -> None:
     fig, ax = plt.subplots(figsize=(8, 4.2))
     x = 0
     ticks = []
     labelled = set()
-    for name, (q, label) in sets.items():
-        rs = [r for r in experiment_runs(cfg, q, label) if r.get("query", q) == q and r["mode"] == "plain"]
+    for name, (q, ids) in sets.items():
+        rs = [r for r in experiment_runs(cfg, ids) if r.get("query", q) == q and r["mode"] == "plain"]
         for c in ("warm", "cold"):
             for sf in (1, 10):
                 ys = [_cpt(r) for r in rs if r["sf"] == sf and r["cache"] == c]
@@ -172,15 +170,17 @@ def fig_queries(cfg: Config, nums: dict, out: Path) -> None:
     style.save(fig, out / "fig4_queries.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
-    assert {"micro", "main"} == set(conds), "use --cond micro=<label> --cond main=<label>"
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
+    assert {"micro", "main"} == set(conds), "use --cond micro=<experiments> --cond main=<experiments>"
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg, conds)
+    (scan,), q6_ids, q3_ids = need(inputs, "scan", "q6", "q3")
+    nums = collect(cfg, conds, scan)
     fig_pieces(nums, out)
     fig_prediction(nums, out)
     fig_cold(cfg, nums, out)
-    fig_queries(cfg, nums, out)
+    fig_queries(cfg, nums, out, {"Q6": ("q6", q6_ids), "Q3": ("q3", q3_ids), "Q1": ("q1", conds["main"].split(","))})
     public = {k: v for k, v in nums.items() if not k.startswith("_")}
     (out / "numbers.json").write_text(json.dumps(public, indent=1, default=str))
     return public

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics as st
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -154,7 +155,8 @@ def predict_cells(cfg: Config, params: ParamSet, query: str, sf: int, rep: dict,
         out.append(Cell(method, direct, extra, t, n * cu + k_rest, n * cu, k_rest, f, n * off,
                         f"pool replica direct={direct} x{kw}: f {f:.3f}, off/read {off * 1e6:.1f} us",
                         {"worker_cpu_s": n * _at(pts, cu, "other")}))
-    return {"query": query, "sf": sf, "params_digest": params.digest(), "replica": rep["dir"], "dU_per_read": du,
+    return {"query": query, "sf": sf, "params_digest": params.digest(), "replica": [os.path.relpath(d, cfg.repo) for d in rep["dir"]],
+            "dU_per_read": du,
             "base": {"time_s": base.time_s, "U": u, "K": k, "K_device": k_dev, "n_reads": n, "start_s": start},
             "cells": [asdict(c) for c in out]}
 

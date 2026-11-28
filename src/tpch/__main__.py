@@ -74,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("cell", help="a cell under queries/ (e.g. q6/sf10), or 'hardware'")
     rp.add_argument("--cond", type=_kv, action="append", default=[], metavar="NAME=LABEL",
                     help="condition name and run label, e.g. --cond A=v1 (repeatable, ordered)")
+    rp.add_argument("--input", type=_kv, action="append", default=[], metavar="NAME=VALUE[,VALUE...]",
+                    help="results the figures are built from, e.g. --input scan=<bench run> (repeatable)")
     rp.add_argument("--out", type=Path, help="output directory (default: the cell directory)")
     rp.add_argument("--timeline", nargs="+", help="condition names drawn in the timeline figure (max 3)")
 
@@ -167,7 +169,10 @@ def _dispatch(a: argparse.Namespace) -> None:
         rel = Path(cell) if (cfg.repo / cell / "figures.py").exists() else Path("queries") / cell
         figures = importlib.import_module(".".join(rel.parts) + ".figures")
         a.out = a.out or cfg.repo / rel
-        nums = figures.build(cfg, dict(a.cond), a.out, a.timeline)
+        inputs: dict[str, list[str]] = {}
+        for name, value in a.input:
+            inputs.setdefault(name, []).extend(value.split(","))
+        nums = figures.build(cfg, dict(a.cond), a.out, a.timeline, inputs)
         for name, c in nums.get("conditions", {}).items():
             print(f"{name} ({c['label']}): cold {c['cold_wall_s']['median']:.2f}s  "
                   f"predicted [{c['prediction']['lower_s']:.1f}, {c['prediction']['upper_s']:.1f}]  "

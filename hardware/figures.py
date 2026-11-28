@@ -1,10 +1,9 @@
 """Device characterization: RAID controller cache and bandwidth vs physical position.
 
-    ./tpch report hardware
+    hardware/report.sh        (the results it reads are listed there)
 
-Uses the newest location scan made with controller-cache eviction (`./tpch bench location`) and
-compares it with every earlier scan, and the newest controller-cache test log.
-and the newest memory-latency run (`./tpch bench mem`).
+The location scan, the earlier scans it is compared with, the memory-latency run (`./tpch bench mem`)
+and the controller-cache test are given as --input.
 Writes fig1_location.png, fig2_memory.png and numbers.json into this directory.
 """
 from __future__ import annotations
@@ -17,9 +16,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from tpch.bench import mem
-from tpch.bench.location import CACHE_HIT_MS, evicted, load_scan, scans
+from tpch.bench.location import CACHE_HIT_MS, evicted, load_scan
 from tpch.config import Config
 from tpch.report import style
+from tpch.report.data import need
 
 
 def _color(target: str) -> str:
@@ -35,23 +35,22 @@ def _bw(rows: list[dict]) -> float | None:
     return sum(r["bytes"] for r in rows) / 2**20 / sum(r["seconds"] for r in rows) if rows else None
 
 
-def _cache_test(cfg: Config) -> dict | None:
-    logs = sorted((cfg.repo / cfg.RESULTS_DIR / "bench").glob("*_controller_cache/log.txt"))
-    if not logs:
-        return None
+def _cache_test(cfg: Config, run: str) -> dict:
+    log = cfg.repo / cfg.RESULTS_DIR / "bench" / run / "log.txt"
     steps = []
-    for line in logs[-1].read_text().splitlines():
+    for line in log.read_text().splitlines():
         m = re.match(r"(C\d)\s+(.*?)\s{2,}.*?([\d.]+) ([MG])B/s", line)
         if m:
             steps.append({"claim": m[1], "step": m[2], "MBps": float(m[3]) * (1000 if m[4] == "G" else 1)})
-    return {"log": str(logs[-1].relative_to(cfg.repo)), "steps": steps}
+    return {"log": str(log.relative_to(cfg.repo)), "steps": steps}
 
 
-def collect(cfg: Config) -> dict:
-    paths = scans(cfg)
-    clean = [p for p in paths if evicted(p)]
-    assert clean, "no location scan with controller-cache eviction: run ./tpch bench location"
-    main_path = clean[-1]
+def collect(cfg: Config, inputs: dict[str, list[str]] | None) -> dict:
+    (scan,), earlier, (mem_run,), (cache_run,) = need(inputs, "scan", "earlier", "mem", "cache_test")
+    bench = cfg.repo / cfg.RESULTS_DIR / "bench"
+    main_path = bench / scan / "location.csv"
+    assert evicted(main_path), f"{scan} was made without controller-cache eviction"
+    paths = [bench / s / "location.csv" for s in earlier]
     main = load_scan(main_path)
     targets = list(dict.fromkeys(r["target"] for r in main))
     files = {t: {r["file"] for r in main if r["target"] == t} for t in targets}
@@ -68,15 +67,15 @@ def collect(cfg: Config) -> dict:
             "r_await_ms": {"min": min(aw), "max": max(aw)},
             # earlier scans of the same files (the first two predate eviction)
             "earlier_MiBps": {p.parent.name: _bw([r for r in load_scan(p) if r["file"] in files[t]])
-                              for p in paths if p != main_path},
+                              for p in paths},
         }
     return {"scan": main_path.parent.name, "cache_hit_ms": CACHE_HIT_MS, "targets": per_target,
-            "earlier_scans_evicted": {p.parent.name: evicted(p) for p in paths if p != main_path},
-            "controller_cache_test": _cache_test(cfg), "memory": _memory(cfg), "_main": main}
+            "earlier_scans_evicted": {p.parent.name: evicted(p) for p in paths},
+            "controller_cache_test": _cache_test(cfg, cache_run), "memory": _memory(cfg, mem_run), "_main": main}
 
 
-def _memory(cfg: Config) -> dict:
-    path = mem.latest(cfg)
+def _memory(cfg: Config, run: str) -> dict:
+    path = cfg.repo / cfg.RESULTS_DIR / "bench" / run / "mem.csv"
     curve = mem.latency_curve(path)
     return {"run": path.parent.name, "ns_by_size_bytes": curve,
             "plateaus_ns": {p: {name: c[size] for name, size in
@@ -120,10 +119,11 @@ def fig_location(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig1_location.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg)
+    nums = collect(cfg, inputs)
     fig_location(nums, out)
     fig_memory(nums, out)
     public = {k: v for k, v in nums.items() if not k.startswith("_")}

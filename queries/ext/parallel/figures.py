@@ -1,13 +1,13 @@
 """E2 (parallel workers): Q6 / Q1 x SF100 with n parallel workers (docs/ext/parallel.md).
 
-    ./tpch report ext/parallel
+    queries/ext/parallel/report.sh        (the results it reads are listed there)
 
 fig1_device      the array's read rate vs streams / participants: leapfrog, continuous streams, one deep stream,
                  and PostgreSQL's Q6 (M1, M2, M7, P1)
 fig2_time        Q6 and Q1 time vs workers: measured and predicted, sync and io_uring (P1, P2)
 fig3_clock       the clock with K busy cores (M1)
 fig4_regimes     worker-mode I/O under a parallel scan: device rate and request order over one run (M6)
-Writes fig1..fig4 and numbers.json into this directory. The runs and benches used are pinned below.
+Writes fig1..fig4 and numbers.json into this directory. The runs and benches are given as --input.
 """
 from __future__ import annotations
 
@@ -21,14 +21,9 @@ import matplotlib.pyplot as plt
 from tpch.config import Config
 from tpch.ext.parallel.m6 import load as load_trace, windows
 from tpch.report import style
+from tpch.report.data import need
 
 BLUE, ORANGE, AQUA = style.SERIES
-M1 = "20261122-174727_parallel_m1"
-M2 = "20261122-185424_parallel_m2"
-M6 = "20261123-022212_parallel_m6"
-M7 = "20261125-155744_parallel_m7"     # the scripted rerun of the 2026-11-23 hand-run probes (same results)
-P1_RUNS = "20261122-18*_q6_sf100_plain_cold_parallel_{m}_n*"
-P2_RUNS = "20261122-19*_q1_sf100_plain_cold_parallel_{m}_n*"
 E1_ONE_BACKEND = {("q6", "sync"): 142.2, ("q6", "io_uring"): 121.2,      # docs/ext/iostack.md, medians of 3 runs
                   ("q1", "sync"): 702.2, ("q1", "io_uring"): 685.6}     # (Q1 io_uring: the held-out runs + diag)
 
@@ -43,12 +38,15 @@ def _cells(cfg: Config, name: str) -> list[dict]:
     return [json.loads(l) for l in (cfg.repo / cfg.RESULTS_DIR / "bench" / name / "cells.jsonl").read_text().splitlines()]
 
 
-def collect(cfg: Config) -> dict:
-    m1, m2, m7 = _cells(cfg, M1), _cells(cfg, M2), _cells(cfg, M7)
+def collect(cfg: Config, inputs: dict[str, list[str]] | None) -> dict:
+    # p1_runs / p2_runs: run-directory globs of Q6 / Q1, with {m} for the I/O method
+    (m1_run,), (m2_run,), (m6_run,), (m7_run,), (p1_runs,), (p2_runs,) = need(
+        inputs, "m1", "m2", "m6", "m7", "p1_runs", "p2_runs")
+    m1, m2, m7 = _cells(cfg, m1_run), _cells(cfg, m2_run), _cells(cfg, m7_run)
     nums: dict = {}
     cont = [c["MiBps"] for c in m7 if c["chunk_MiB"] == 0 and c["direct"] == 1]
     pg = sorted((int(m["settings"]["max_parallel_workers_per_gather"]) + 1, s["dev_avg_read_MiBps"])
-                for m, s in _runs(cfg, P1_RUNS.format(m="sync")))
+                for m, s in _runs(cfg, p1_runs.format(m="sync")))
     nums["device"] = {
         "leapfrog_direct_qd1": sorted((c["P"], c["MiBps"]) for c in m2 if c["cell"].startswith("par:psync:1:")),
         "leapfrog_direct_qd16": sorted((c["P"], c["MiBps"]) for c in m2 if c["cell"].startswith("par:uring:1:")),
@@ -57,7 +55,7 @@ def collect(cfg: Config) -> dict:
         "pg_q6_sync": pg}
     nums["time"] = {}
     model = cfg.repo / "model" / "ext" / "parallel"
-    for q, pattern, pfile in (("q6", P1_RUNS, "q6_p1.json"), ("q1", P2_RUNS, "q1_p2.json")):
+    for q, pattern, pfile in (("q6", p1_runs, "q6_p1.json"), ("q1", p2_runs, "q1_p2.json")):
         pred = json.loads((model / pfile).read_text())["cells"]
         for m in ("sync", "io_uring"):
             meas = sorted((int(mm["settings"]["max_parallel_workers_per_gather"]), s["wall_s"])
@@ -67,7 +65,7 @@ def collect(cfg: Config) -> dict:
     nums["clock_busy_cores"] = sorted((int(c["cell"].split(":")[1]), c["GHz"]) for c in m1 if c["cell"].startswith("cores:"))
     nums["regimes"] = {}
     for tag in ("worker_off_1", "sync_off_1"):
-        rows = load_trace(cfg.repo / cfg.RESULTS_DIR / "bench" / M6 / f"trace_{tag}.csv")
+        rows = load_trace(cfg.repo / cfg.RESULTS_DIR / "bench" / m6_run / f"trace_{tag}.csv")
         ws = [w for w in windows(rows, 5.0) if w["n"] > 50]
         start = next(i for i, w in enumerate(ws) if w["MBps"] > 300 and w["t"] > 10)   # after the cold restart
         ws = ws[start:]
@@ -144,10 +142,11 @@ def fig_regimes(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig4_regimes.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg)
+    nums = collect(cfg, inputs)
     fig_device(nums, out)
     fig_time(nums, out)
     fig_clock(nums, out)

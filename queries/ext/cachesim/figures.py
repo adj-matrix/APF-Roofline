@@ -1,6 +1,6 @@
 """E4 (page cache): capacity, retention and write-back timing, Q3 x SF100 (docs/ext/cachesim.md).
 
-    ./tpch report ext/cachesim
+    queries/ext/cachesim/report.sh        (the results it reads are listed there)
 
 fig1_placement   page cache per NUMA node while a process bound to node 0 (left) or not bound (right) streams 45 GiB (M1)
 fig2_retention   share of an 8 GiB file still cached after reading R GiB of other data, against LRU with node 0's capacity (M1)
@@ -8,7 +8,7 @@ fig3_q3          Q3 64MB with memory pinned on node 0: data read back from the d
                  capacity-only model and the final model (capacity + turnover) (M2, M4)
 fig4_writeback   spill-file extents and read-back waiting under pinned memory, with and without a table scan turning
                  the cache over (M3)
-Writes fig1..fig4 and numbers.json into this directory. The runs and benches used are pinned below.
+Writes fig1..fig4 and numbers.json into this directory. The runs and benches are given as --input.
 """
 from __future__ import annotations
 
@@ -25,11 +25,9 @@ from matplotlib.patches import Patch
 from tpch.config import Config
 from tpch.model.data import Run
 from tpch.report import style
+from tpch.report.data import need
 
 BLUE, ORANGE, AQUA = style.SERIES
-M1 = "20261123-151131_cachesim_m1"
-M3 = "20261123-170821_cachesim_m3"
-Q3_RUNS = "20261123-1[5-7]*_q3_sf100_plain_cold_cachesim_*_r0"      # M2 (24 GiB) and M4 (20 GiB)
 WRITTEN_GIB = 8
 
 
@@ -37,9 +35,10 @@ def _bench(cfg: Config, name: str) -> Path:
     return cfg.repo / cfg.RESULTS_DIR / "bench" / name
 
 
-def collect(cfg: Config) -> dict:
+def collect(cfg: Config, inputs: dict[str, list[str]] | None) -> dict:
+    (m1_run,), (m3_run,), (q3_runs,) = need(inputs, "m1", "m3", "q3_runs")   # q3_runs: M2 (24 GiB) and M4 (20 GiB)
     nums: dict = {}
-    m1 = _bench(cfg, M1)
+    m1 = _bench(cfg, m1_run)
     marks = {label: float(t) for t, label in csv.reader(open(m1 / "marks.csv"))}
     series: dict = {}
     for t, node, key, kb in csv.reader(open(m1 / "nodes.csv")):
@@ -59,7 +58,7 @@ def collect(cfg: Config) -> dict:
     fin20 = json.loads((model / "heldout_balloon20.json").read_text())["cells"]
     fin24 = json.loads((model / "seen_balloon24_final.json").read_text())["cells"]
     runs: dict = {}
-    for d in sorted(glob.glob(str(cfg.repo / cfg.RESULTS_DIR / "runs" / Q3_RUNS))):
+    for d in sorted(glob.glob(str(cfg.repo / cfg.RESULTS_DIR / "runs" / q3_runs))):
         d = Path(d)
         r = Run(d, json.loads((d / "meta.json").read_text()), json.loads((d / "summary.json").read_text()))
         pinned = 24 if r.meta["label"] == "cachesim_balloon" else 20 if r.meta["label"] == "cachesim_balloon20" else 0
@@ -75,7 +74,7 @@ def collect(cfg: Config) -> dict:
     # M3: layout and read-back
     nums["writeback"] = {}
     for cell in ("b0_r450", "b16_r450", "b24_r450", "b24_r0"):
-        r = json.loads((_bench(cfg, M3) / f"result_{cell}.json").read_text())
+        r = json.loads((_bench(cfg, m3_run) / f"result_{cell}.json").read_text())
         nums["writeback"][cell] = {"extents_per_outer_file": sum(r["layout"]["outer_hist"]) / r["batches"],
                                    "readback_off_cpu_s": r["passes"][0]["off_cpu_s"]}
     nums["writeback_predicted_extents"] = {"b0_r450": 3.4, "b16_r450": 3.5, "b24_r450": 7.8, "b24_r0": 3.4}   # docs, M3
@@ -175,10 +174,11 @@ def fig_writeback(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig4_writeback.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg)
+    nums = collect(cfg, inputs)
     fig_placement(nums, out)
     fig_retention(nums, out)
     fig_q3(nums, out)

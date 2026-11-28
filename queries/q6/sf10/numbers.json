@@ -150,7 +150,7 @@
           "IO/CPU combined as max; true value expected in [max, sum]"
         ]
       },
-      "error_vs_lower": 0.06652444509544031,
+      "error_vs_lower": -0.06237498390342777,
       "overlap_frac": 0.7140985052193398
     },
     "B1": {
@@ -285,7 +285,7 @@
           "IO/CPU combined as max; true value expected in [max, sum]"
         ]
       },
-      "error_vs_lower": -0.04039900446270983,
+      "error_vs_lower": 0.04209979423801036,
       "overlap_frac": 1.190184008800372
     },
     "B2": {
@@ -427,7 +427,7 @@
           "IO/CPU combined as max; true value expected in [max, sum]"
         ]
       },
-      "error_vs_lower": 0.024993700124467555,
+      "error_vs_lower": -0.024384247553358107,
       "overlap_frac": 0.8837673049862691
     },
     "C": {
@@ -569,7 +569,7 @@
           "IO/CPU combined as max; true value expected in [max, sum]"
         ]
       },
-      "error_vs_lower": 0.022438957236612822,
+      "error_vs_lower": -0.021946500647099132,
       "overlap_frac": 0.9063977462536575
     }
   }

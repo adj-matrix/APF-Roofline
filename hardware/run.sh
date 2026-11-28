@@ -17,7 +17,7 @@ data)
   ./tpch bench location --table 1:orders 1:customer 10:orders 10:customer
                                         # bandwidth vs position; evicts the controller cache first
   ./tpch bench mem                      # random-access latency vs working-set size (CPU only)
-  ./tpch report hardware
+  echo "figures: put the new run ids into hardware/report.sh, then run it"
   # fio block-size sweep: ./tpch bench io (results in report #1, queries/q6/sf10)
   ;;
 big)

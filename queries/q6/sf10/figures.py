@@ -1,6 +1,6 @@
 """Report #1 (Q6 @ SF10): collect runs per condition, predict, compare, draw figures.
 
-    ./tpch report q6/sf10 --cond A=v1 --cond B1=v2defrag --cond B2=condB --cond C=condC --timeline A B2 C
+    queries/q6/sf10/report.sh        (the results it reads are listed there)
 
 Writes (by default into this directory) fig1_fio.png .. fig4_breakdown.png and numbers.json (every number the
 report text cites, so text and figures come from the same data).
@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from tpch.config import Config
 from tpch.model.common import HwParams, TableStats
 from tpch.report import style
+from tpch.report.data import need
 
 from queries.q6.model import predict_q6
 
@@ -48,16 +49,16 @@ def _stats(xs: list[float]) -> dict:
     return {"median": st.median(xs), "min": min(xs), "max": max(xs), "n": len(xs), "values": xs}
 
 
-def _fio(cfg: Config) -> dict[str, list[dict]]:
+def _fio(cfg: Config, benches: list[str]) -> dict[str, list[dict]]:
     by_test: dict[str, list[dict]] = {}
-    for f in sorted((cfg.repo / cfg.RESULTS_DIR / "bench").glob("*_io/io.csv")):
+    for f in (cfg.repo / cfg.RESULTS_DIR / "bench" / b / "io.csv" for b in benches):
         for r in csv.DictReader(open(f)):
             by_test.setdefault(r["test"], []).append(r)
     return by_test
 
 
-def collect(cfg: Config, conds: dict[str, str]) -> dict:
-    fio = _fio(cfg)
+def collect(cfg: Config, conds: dict[str, str], benches: list[str]) -> dict:
+    fio = _fio(cfg, benches)
     seq_bw = _stats([float(r["MiBps"]) for r in fio["seq_buffered_8k_t1"]])
     nums: dict = {"fio_seq_buffered_8k_MiBps": seq_bw, "conditions": {}}
     for name, label in conds.items():
@@ -96,7 +97,7 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
         p = predict_q6(TableStats("lineitem", pages, LINEITEM_TUPLES_SF10), hw)
         c["cpu_ns_per_tuple"] = ns_per_tuple
         c["prediction"] = p.as_dict()
-        c["error_vs_lower"] = c["cold_wall_s"]["median"] / p.lower_s - 1
+        c["error_vs_lower"] = p.lower_s / c["cold_wall_s"]["median"] - 1
         c["overlap_frac"] = (p.upper_s - c["cold_wall_s"]["median"]) / p.components["cpu_s"]
         nums["conditions"][name] = c
     return nums
@@ -104,8 +105,8 @@ def collect(cfg: Config, conds: dict[str, str]) -> dict:
 
 # ---------------------------------------------------------------------------------- figures
 
-def fig_fio(cfg: Config, out: Path) -> None:
-    fio = _fio(cfg)
+def fig_fio(cfg: Config, out: Path, benches: list[str]) -> None:
+    fio = _fio(cfg, benches)
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(9, 3.4), gridspec_kw={"wspace": 0.3})
     sizes = [4, 8, 16, 32, 64, 128, 256, 512, 1024]
     for ax, key, title, ylabel in (
@@ -174,7 +175,7 @@ def fig_prediction(nums: dict, out: Path) -> None:
         ax.hlines(y, w["min"], w["max"], color=style.SERIES[1], linewidth=1.5)
         ax.plot(w["median"], y, "o", color=style.SERIES[1], markersize=8,
                 markeredgecolor=style.SURFACE, markeredgewidth=2)
-        ax.text(p["upper_s"] + 0.4, y, f"measured {w['median']:.1f} s  ({c['error_vs_lower']:+.0%} vs IO-only)",
+        ax.text(p["upper_s"] + 0.4, y, f"measured {w['median']:.1f} s  (IO-only prediction {c['error_vs_lower']:+.0%})",
                 va="center", fontsize=9, color=style.INK)
     ax.set_yticks(range(len(names)), [_desc(n, nums["conditions"][n]["label"]) for n in names])
     ax.invert_yaxis()
@@ -215,11 +216,13 @@ def fig_breakdown(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig4_breakdown.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg, conds)
-    fig_fio(cfg, out)
+    (benches,) = need(inputs, "fio")
+    nums = collect(cfg, conds, benches)
+    fig_fio(cfg, out, benches)
     fig_timeline(cfg, nums, out, (timeline or list(conds))[:3])
     fig_prediction(nums, out)
     fig_breakdown(nums, out)

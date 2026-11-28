@@ -1,13 +1,13 @@
 """E3 (attribution): where the user cycles go, Q6 / Q1 x SF100, cold, sync / buffered (docs/ext/attribution.md).
 
-    ./tpch report ext/attribution
+    queries/ext/attribution/report.sh        (the results it reads are listed there)
 
 fig1_breakdown   user cycles per 128 KiB read, by component group, as workers are added (A1)
 fig2_scaling     the buffer manager's share and the cycles per read relative to one backend, vs workers (A1)
 fig3_floor       the per-page components on five workloads, three of them held out (A2)
 A1 used the first component rules and kept only the top 40 functions: ~2 % of the cycles it files under
 "other" belong to the buffer manager / expressions (docs, "What A1 settles"). A2 uses the corrected rules.
-Writes fig1..fig3 and numbers.json into this directory. The benches used are pinned below.
+Writes fig1..fig3 and numbers.json into this directory. The runs and benches are given as --input.
 """
 from __future__ import annotations
 
@@ -19,12 +19,9 @@ import matplotlib.pyplot as plt
 
 from tpch.config import Config
 from tpch.report import style
+from tpch.report.data import need
 
 BLUE, ORANGE, AQUA = style.SERIES
-A1, A1_PERIOD = "20261123-140514_attribution_a1", 20000003
-A2, A2_PERIOD = "20261123-144847_attribution_a2", 2000003
-A1_RUNS = "20261123-1[34]*_{q}_sf100_plain_cold_attribution_n{n}_r0"
-A2_RUNS = "20261123-1[45]*_sf100_plain_cold_attribution_a2_r0"
 GROUPS = [("per-page floor: verification, buffer manager, heap page", ("checksum", "bufmgr", "heap_page"), BLUE),
           ("tuple work: deforming, expressions", ("deform", "expression"), ORANGE),
           ("aggregation, executor, other", ("agg_exec", "other", "libc", "other_dso", "hash_bytes"), AQUA)]
@@ -43,24 +40,27 @@ def _per_read(profile: dict, reads: float, period: int, keys) -> float:
     return sum(c.get(k, {}).get("cycles_share", 0) for k in keys) * profile["samples_cycles"] * period / reads / 1e3
 
 
-def collect(cfg: Config) -> dict:
+def collect(cfg: Config, inputs: dict[str, list[str]] | None) -> dict:
+    (a1,), (a1_period,), (a1_runs,), (a2,), (a2_period,), (a2_runs,) = need(
+        inputs, "a1", "a1_period", "a1_runs", "a2", "a2_period", "a2_runs")
+    a1_period, a2_period = int(a1_period), int(a2_period)
     bench = cfg.repo / cfg.RESULTS_DIR / "bench"
     nums: dict = {"a1": {}, "a2": {}}
     for q in ("q6", "q1"):
         for n in (0, 1, 3, 7):
-            prof = json.loads((bench / A1 / f"{q}_n{n}.json").read_text())
-            reads = _summary(cfg, A1_RUNS.format(q=q, n=n))["dev_read_MiB"] / 0.125
+            prof = json.loads((bench / a1 / f"{q}_n{n}.json").read_text())
+            reads = _summary(cfg, a1_runs.format(q=q, n=n))["dev_read_MiB"] / 0.125
             nums["a1"][f"{q}_n{n}"] = {
-                "groups_kcycles_per_read": {g: _per_read(prof, reads, A1_PERIOD, keys) for g, keys, _ in GROUPS},
+                "groups_kcycles_per_read": {g: _per_read(prof, reads, a1_period, keys) for g, keys, _ in GROUPS},
                 "bufmgr_share": prof["components"]["bufmgr"]["cycles_share"],
-                "kcycles_per_read": prof["samples_cycles"] * A1_PERIOD / reads / 1e3,
-                "kinstr_per_read": prof["samples_instr"] * A1_PERIOD / reads / 1e3}
+                "kcycles_per_read": prof["samples_cycles"] * a1_period / reads / 1e3,
+                "kinstr_per_read": prof["samples_instr"] * a1_period / reads / 1e3}
     runs = {s["query"]: s for s in (json.loads((Path(d) / "summary.json").read_text())
-                                    for d in glob.glob(str(cfg.repo / cfg.RESULTS_DIR / "runs" / A2_RUNS)))}
+                                    for d in glob.glob(str(cfg.repo / cfg.RESULTS_DIR / "runs" / a2_runs)))}
     for q, name, tpp in WORKLOADS:
-        prof = json.loads((bench / A2 / f"{q}.json").read_text())
+        prof = json.loads((bench / a2 / f"{q}.json").read_text())
         reads = runs[q]["dev_read_MiB"] / 0.125
-        nums["a2"][name] = {"tuples_per_page": tpp, **{k: _per_read(prof, reads, A2_PERIOD, (k,))
+        nums["a2"][name] = {"tuples_per_page": tpp, **{k: _per_read(prof, reads, a2_period, (k,))
                                                        for k in ("checksum", "bufmgr", "heap_page")}}
     return nums
 
@@ -129,10 +129,11 @@ def fig_floor(nums: dict, out: Path) -> None:
     style.save(fig, out / "fig3_floor.png")
 
 
-def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None) -> dict:
+def build(cfg: Config, conds: dict[str, str], out: Path, timeline: list[str] | None = None,
+          inputs: dict[str, list[str]] | None = None) -> dict:
     style.apply()
     out.mkdir(parents=True, exist_ok=True)
-    nums = collect(cfg)
+    nums = collect(cfg, inputs)
     fig_breakdown(nums, out)
     fig_scaling(nums, out)
     fig_floor(nums, out)
